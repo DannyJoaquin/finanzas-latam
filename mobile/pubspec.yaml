@@ -70,6 +70,8 @@ dev_dependencies:
   json_serializable: ^6.8.0
   riverpod_generator: ^2.4.0
   go_router_builder: ^2.7.0
+  plugin_platform_interface: ^2.1.8
+  path_provider_platform_interface: ^2.1.2
 
 flutter:
   uses-material-design: true
