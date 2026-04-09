@@ -48,6 +48,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    await ref.read(authStateProvider.notifier).loginWithGoogle();
+    if (!mounted) return;
+    final authAsync = ref.read(authStateProvider);
+    if (authAsync.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyGoogleError(authAsync.error))),
+      );
+    }
+  }
+
+  String _friendlyGoogleError(Object? err) {
+    if (err == null) return 'Error desconocido';
+    final msg = err.toString().toLowerCase();
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Sin conexión. Verifica tu internet.';
+    }
+    if (msg.contains('401') || msg.contains('unauthorized')) {
+      return 'Token de Google inválido. Intenta nuevamente.';
+    }
+    return 'Error con Google. Intenta nuevamente.';
+  }
+
   String _friendlyError(Object? err) {
     if (err == null) return 'Error desconocido';
     final msg = err.toString().toLowerCase();
@@ -167,11 +190,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'o continúa con',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _GoogleSignInButton(
+                  isLoading: isLoading,
+                  onPressed: _signInWithGoogle,
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({required this.isLoading, required this.onPressed});
+
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return OutlinedButton(
+      onPressed: isLoading ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: BorderSide(color: colorScheme.outline),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        minimumSize: const Size(double.infinity, 52),
+      ),
+      child: isLoading
+          ? SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Simple "G" logo using text styling — avoids needing an SVG asset
+                Text(
+                  'G',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Continuar con Google',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
+                      ),
+                ),
+              ],
+            ),
     );
   }
 }

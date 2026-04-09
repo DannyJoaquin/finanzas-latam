@@ -34,9 +34,9 @@ export class User {
   @Column({ length: 20, nullable: true })
   phone: string;
 
-  @Column({ name: 'password_hash', length: 255 })
+  @Column({ name: 'password_hash', length: 255, nullable: true })
   @Exclude()
-  passwordHash: string;
+  passwordHash: string | null;
 
   @Column({ name: 'full_name', length: 150 })
   fullName: string;
@@ -79,6 +79,13 @@ export class User {
 
   @Column({ name: 'email_verified', default: false })
   emailVerified: boolean;
+
+  // OAuth provider fields (null for email/password users)
+  @Column({ length: 50, nullable: true })
+  provider: string | null;
+
+  @Column({ name: 'provider_id', length: 255, nullable: true })
+  providerId: string | null;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

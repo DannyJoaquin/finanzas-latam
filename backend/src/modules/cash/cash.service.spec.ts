@@ -12,6 +12,7 @@ const mockAccountRepo = () => ({
   create: jest.fn(),
   save: jest.fn(),
   delete: jest.fn(),
+  remove: jest.fn(),
 });
 
 const mockTxRepo = () => ({

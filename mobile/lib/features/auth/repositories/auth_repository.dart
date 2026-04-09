@@ -5,6 +5,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/token_storage.dart';
 import '../models/auth_models.dart';
+import '../services/google_auth_service.dart';
 
 class AuthRepository {
   const AuthRepository(this._dio, this._tokens);
@@ -61,6 +62,44 @@ class AuthRepository {
       } catch (_) {}
     }
     await _tokens.clearTokens();
+    // Sign out from Google if the user logged in via Google
+    try {
+      await GoogleAuthService().signOut();
+    } catch (_) {}
+  }
+
+  /// Sign in with Google. Returns null if user cancelled.
+  Future<AuthState?> loginWithGoogle() async {
+    final idToken = await GoogleAuthService().signIn();
+    if (idToken == null) return null; // user cancelled
+
+    final resp = await _dio.post(ApiConstants.googleAuth, data: {'idToken': idToken});
+    final data = resp.data as Map<String, dynamic>;
+    final accessToken = data['accessToken'] as String;
+    await _tokens.saveTokens(
+      accessToken: accessToken,
+      refreshToken: data['refreshToken'] as String,
+    );
+    final userJson = data['user'] as Map<String, dynamic>;
+    // Fetch full user profile (includes currency, payCycle, etc.)
+    try {
+      final meResp = await _dio.get(ApiConstants.me);
+      final user = UserModel.fromJson(meResp.data as Map<String, dynamic>);
+      await _tokens.saveUser(user.toJson());
+      return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+    } catch (_) {
+      // Fallback: build user from Google response payload
+      final user = UserModel(
+        id: userJson['id'] as String,
+        email: userJson['email'] as String,
+        fullName: userJson['fullName'] as String? ?? '',
+        currency: 'HNL',
+        payCycle: 'monthly',
+        avatarUrl: userJson['avatarUrl'] as String?,
+      );
+      await _tokens.saveUser(user.toJson());
+      return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+    }
   }
 
   Future<AuthState?> tryRestoreSession() async {

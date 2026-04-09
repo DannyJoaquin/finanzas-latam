@@ -11,6 +11,7 @@ import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
 import jwtConfig from './config/jwt.config';
 import awsConfig from './config/aws.config';
+import googleConfig from './config/google.config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -39,7 +40,7 @@ import { Expense } from './modules/expenses/expense.entity';
     // ── Config ────────────────────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, jwtConfig, awsConfig],
+      load: [appConfig, databaseConfig, redisConfig, jwtConfig, awsConfig, googleConfig],
     }),
 
     // ── Database ──────────────────────────────────────────────────────────
