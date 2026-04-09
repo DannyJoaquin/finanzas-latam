@@ -1,0 +1,128 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class InitialSchema1775450123406 implements MigrationInterface {
+    name = 'InitialSchema1775450123406'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE "income_records" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "income_id" uuid NOT NULL, "user_id" uuid NOT NULL, "amount" numeric(12,2) NOT NULL, "received_at" date NOT NULL, "notes" text, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_4ac197a85317ab0af01c7fa19e2" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_income_records_user_date" ON "income_records" ("user_id", "received_at") `);
+        await queryRunner.query(`CREATE TYPE "public"."incomes_type_enum" AS ENUM('salary', 'variable', 'remittance', 'freelance', 'other')`);
+        await queryRunner.query(`CREATE TYPE "public"."incomes_cycle_enum" AS ENUM('weekly', 'biweekly', 'monthly', 'one_time')`);
+        await queryRunner.query(`CREATE TABLE "incomes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "source_name" character varying(150) NOT NULL, "amount" numeric(12,2) NOT NULL, "currency" character(3) NOT NULL DEFAULT 'HNL', "type" "public"."incomes_type_enum" NOT NULL, "cycle" "public"."incomes_cycle_enum" NOT NULL, "pay_day_1" smallint, "pay_day_2" smallint, "next_expected_at" date, "is_active" boolean NOT NULL DEFAULT true, "notes" text, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_d737b3d0314c1f0da5461a55e5e" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_incomes_user_active" ON "incomes" ("user_id", "is_active") `);
+        await queryRunner.query(`CREATE TYPE "public"."categories_type_enum" AS ENUM('expense', 'income')`);
+        await queryRunner.query(`CREATE TABLE "categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid, "parent_id" uuid, "name" character varying(100) NOT NULL, "icon" character varying(50), "color" character(7), "type" "public"."categories_type_enum" NOT NULL, "is_system" boolean NOT NULL DEFAULT false, "sort_order" smallint NOT NULL DEFAULT '0', "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_24dbc6126a28ff948da33e97d3b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_categories_parent" ON "categories" ("parent_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_categories_user_type" ON "categories" ("user_id", "type") `);
+        await queryRunner.query(`CREATE TYPE "public"."cash_transactions_type_enum" AS ENUM('deposit', 'withdraw', 'spend', 'receive_transfer', 'send_transfer')`);
+        await queryRunner.query(`CREATE TABLE "cash_transactions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "cash_account_id" uuid NOT NULL, "user_id" uuid NOT NULL, "type" "public"."cash_transactions_type_enum" NOT NULL, "amount" numeric(12,2) NOT NULL, "description" character varying(255), "expense_id" uuid, "date" date NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_df7299c9dda9bf4b78d874e588e" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_cash_tx_account_date" ON "cash_transactions" ("cash_account_id", "date") `);
+        await queryRunner.query(`CREATE TABLE "cash_accounts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "name" character varying(100) NOT NULL, "balance" numeric(12,2) NOT NULL DEFAULT '0', "currency" character(3) NOT NULL DEFAULT 'HNL', "color" character(7), "icon" character varying(50), "is_default" boolean NOT NULL DEFAULT false, "sort_order" smallint NOT NULL DEFAULT '0', "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_c10b1fd07d801b17fb333711b2b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."expenses_payment_method_enum" AS ENUM('cash', 'card_credit', 'card_debit', 'transfer', 'other')`);
+        await queryRunner.query(`CREATE TYPE "public"."expenses_source_enum" AS ENUM('manual', 'voice', 'ocr', 'sms', 'whatsapp', 'auto')`);
+        await queryRunner.query(`CREATE TABLE "expenses" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "category_id" uuid, "amount" numeric(12,2) NOT NULL, "currency" character(3) NOT NULL DEFAULT 'HNL', "description" character varying(255), "payment_method" "public"."expenses_payment_method_enum" NOT NULL DEFAULT 'cash', "date" date NOT NULL, "receipt_url" text, "location_lat" numeric(9,6), "location_lng" numeric(9,6), "location_name" character varying(200), "tags" text array NOT NULL DEFAULT '{}', "is_recurring" boolean NOT NULL DEFAULT false, "cash_account_id" uuid, "source" "public"."expenses_source_enum" NOT NULL DEFAULT 'manual', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_94c3ceb17e3140abc9282c20610" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_expenses_method" ON "expenses" ("user_id", "payment_method") `);
+        await queryRunner.query(`CREATE INDEX "idx_expenses_category" ON "expenses" ("category_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_expenses_user_date" ON "expenses" ("user_id", "date") `);
+        await queryRunner.query(`CREATE TYPE "public"."budgets_period_type_enum" AS ENUM('weekly', 'biweekly', 'monthly')`);
+        await queryRunner.query(`CREATE TABLE "budgets" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "category_id" uuid, "name" character varying(100), "amount" numeric(12,2) NOT NULL, "period_type" "public"."budgets_period_type_enum" NOT NULL, "period_start" date NOT NULL, "period_end" date NOT NULL, "alert_50_sent" boolean NOT NULL DEFAULT false, "alert_80_sent" boolean NOT NULL DEFAULT false, "alert_100_sent" boolean NOT NULL DEFAULT false, "is_active" boolean NOT NULL DEFAULT true, "is_dynamic" boolean NOT NULL DEFAULT false, "dynamic_pct" numeric(5,2), "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_9c8a51748f82387644b773da482" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_budgets_category" ON "budgets" ("user_id", "category_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_budgets_user_period" ON "budgets" ("user_id", "period_start", "period_end") `);
+        await queryRunner.query(`CREATE TYPE "public"."goal_contributions_source_enum" AS ENUM('manual', 'auto_rule', 'income')`);
+        await queryRunner.query(`CREATE TABLE "goal_contributions" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "goal_id" uuid NOT NULL, "user_id" uuid NOT NULL, "amount" numeric(12,2) NOT NULL, "source" "public"."goal_contributions_source_enum" NOT NULL DEFAULT 'manual', "date" date NOT NULL, "notes" text, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_33413874ace4630a4451a4f4bda" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TYPE "public"."goals_status_enum" AS ENUM('active', 'completed', 'paused', 'cancelled')`);
+        await queryRunner.query(`CREATE TABLE "goals" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "name" character varying(150) NOT NULL, "description" text, "target_amount" numeric(12,2) NOT NULL, "current_amount" numeric(12,2) NOT NULL DEFAULT '0', "currency" character(3) NOT NULL DEFAULT 'HNL', "target_date" date, "icon" character varying(50), "color" character(7), "status" "public"."goals_status_enum" NOT NULL DEFAULT 'active', "auto_save_pct" numeric(5,2), "auto_save_fixed" numeric(12,2), "priority" smallint NOT NULL DEFAULT '1', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_26e17b251afab35580dff769223" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_goals_user_status" ON "goals" ("user_id", "status") `);
+        await queryRunner.query(`CREATE TYPE "public"."insights_type_enum" AS ENUM('savings_opportunity', 'anomaly', 'projection', 'streak', 'budget_warning', 'pattern')`);
+        await queryRunner.query(`CREATE TYPE "public"."insights_priority_enum" AS ENUM('low', 'medium', 'high', 'critical')`);
+        await queryRunner.query(`CREATE TABLE "insights" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "type" "public"."insights_type_enum" NOT NULL, "priority" "public"."insights_priority_enum" NOT NULL DEFAULT 'medium', "title" character varying(200) NOT NULL, "body" text NOT NULL, "metadata" jsonb, "is_read" boolean NOT NULL DEFAULT false, "is_dismissed" boolean NOT NULL DEFAULT false, "generated_at" TIMESTAMP NOT NULL DEFAULT now(), "expires_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_8616ab29fa49b7942541b8c964a" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_insights_type" ON "insights" ("user_id", "type") `);
+        await queryRunner.query(`CREATE INDEX "idx_insights_user_unread" ON "insights" ("user_id", "is_read", "is_dismissed") `);
+        await queryRunner.query(`CREATE TYPE "public"."rules_trigger_type_enum" AS ENUM('expense_added', 'budget_threshold', 'income_received', 'goal_milestone', 'periodic')`);
+        await queryRunner.query(`CREATE TABLE "rules" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "name" character varying(150) NOT NULL, "is_active" boolean NOT NULL DEFAULT true, "trigger_type" "public"."rules_trigger_type_enum" NOT NULL, "conditions" jsonb NOT NULL, "actions" jsonb NOT NULL, "priority" smallint NOT NULL DEFAULT '1', "last_triggered" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_10fef696a7d61140361b1b23608" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "idx_rules_user_active" ON "rules" ("user_id", "is_active") `);
+        await queryRunner.query(`CREATE TYPE "public"."users_pay_cycle_enum" AS ENUM('weekly', 'biweekly', 'monthly')`);
+        await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying(255) NOT NULL, "phone" character varying(20), "password_hash" character varying(255) NOT NULL, "full_name" character varying(150) NOT NULL, "avatar_url" text, "country_code" character(2) NOT NULL DEFAULT 'HN', "currency" character(3) NOT NULL DEFAULT 'HNL', "pay_cycle" "public"."users_pay_cycle_enum" NOT NULL DEFAULT 'biweekly', "pay_day_1" smallint, "pay_day_2" smallint, "timezone" character varying(60) NOT NULL DEFAULT 'America/Tegucigalpa', "biometric_enabled" boolean NOT NULL DEFAULT false, "pin_hash" character varying(255), "fcm_token" text, "email_verified" boolean NOT NULL DEFAULT false, "is_active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`ALTER TABLE "income_records" ADD CONSTRAINT "FK_db868432b42e2a89dc23f595c0a" FOREIGN KEY ("income_id") REFERENCES "incomes"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "income_records" ADD CONSTRAINT "FK_faa2f5fe39ca82c6563f16e6574" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "incomes" ADD CONSTRAINT "FK_400664fad260d8fa50ecb78ffe6" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "categories" ADD CONSTRAINT "FK_2296b7fe012d95646fa41921c8b" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "categories" ADD CONSTRAINT "FK_88cea2dc9c31951d06437879b40" FOREIGN KEY ("parent_id") REFERENCES "categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" ADD CONSTRAINT "FK_282bdc000a9a9d868b87e1c3670" FOREIGN KEY ("cash_account_id") REFERENCES "cash_accounts"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" ADD CONSTRAINT "FK_c68eb9ab43c81c4aa9269866e06" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" ADD CONSTRAINT "FK_50f3e212894787902be708d6788" FOREIGN KEY ("expense_id") REFERENCES "expenses"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "cash_accounts" ADD CONSTRAINT "FK_36bcc7382992e4271085acf5d1e" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "expenses" ADD CONSTRAINT "FK_49a0ca239d34e74fdc4e0625a78" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "expenses" ADD CONSTRAINT "FK_5d1f4be708e0dfe2afa1a3c376c" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "expenses" ADD CONSTRAINT "FK_05adf6524c0a3297125bdb5402a" FOREIGN KEY ("cash_account_id") REFERENCES "cash_accounts"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "budgets" ADD CONSTRAINT "FK_5d25d8bbd6c209261dfe04558f1" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "budgets" ADD CONSTRAINT "FK_4bb589bf6db49e8c1fd6af05f49" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "goal_contributions" ADD CONSTRAINT "FK_a3486f892fb14eceb63fd37d492" FOREIGN KEY ("goal_id") REFERENCES "goals"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "goal_contributions" ADD CONSTRAINT "FK_e27cae0382bdaa2b997fcf4be03" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "goals" ADD CONSTRAINT "FK_88b78010581f2d293699d064441" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "insights" ADD CONSTRAINT "FK_fa35bbb946c341de84030e1a7e5" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "rules" ADD CONSTRAINT "FK_a25301750f8ef387215a9c6043b" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "rules" DROP CONSTRAINT "FK_a25301750f8ef387215a9c6043b"`);
+        await queryRunner.query(`ALTER TABLE "insights" DROP CONSTRAINT "FK_fa35bbb946c341de84030e1a7e5"`);
+        await queryRunner.query(`ALTER TABLE "goals" DROP CONSTRAINT "FK_88b78010581f2d293699d064441"`);
+        await queryRunner.query(`ALTER TABLE "goal_contributions" DROP CONSTRAINT "FK_e27cae0382bdaa2b997fcf4be03"`);
+        await queryRunner.query(`ALTER TABLE "goal_contributions" DROP CONSTRAINT "FK_a3486f892fb14eceb63fd37d492"`);
+        await queryRunner.query(`ALTER TABLE "budgets" DROP CONSTRAINT "FK_4bb589bf6db49e8c1fd6af05f49"`);
+        await queryRunner.query(`ALTER TABLE "budgets" DROP CONSTRAINT "FK_5d25d8bbd6c209261dfe04558f1"`);
+        await queryRunner.query(`ALTER TABLE "expenses" DROP CONSTRAINT "FK_05adf6524c0a3297125bdb5402a"`);
+        await queryRunner.query(`ALTER TABLE "expenses" DROP CONSTRAINT "FK_5d1f4be708e0dfe2afa1a3c376c"`);
+        await queryRunner.query(`ALTER TABLE "expenses" DROP CONSTRAINT "FK_49a0ca239d34e74fdc4e0625a78"`);
+        await queryRunner.query(`ALTER TABLE "cash_accounts" DROP CONSTRAINT "FK_36bcc7382992e4271085acf5d1e"`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" DROP CONSTRAINT "FK_50f3e212894787902be708d6788"`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" DROP CONSTRAINT "FK_c68eb9ab43c81c4aa9269866e06"`);
+        await queryRunner.query(`ALTER TABLE "cash_transactions" DROP CONSTRAINT "FK_282bdc000a9a9d868b87e1c3670"`);
+        await queryRunner.query(`ALTER TABLE "categories" DROP CONSTRAINT "FK_88cea2dc9c31951d06437879b40"`);
+        await queryRunner.query(`ALTER TABLE "categories" DROP CONSTRAINT "FK_2296b7fe012d95646fa41921c8b"`);
+        await queryRunner.query(`ALTER TABLE "incomes" DROP CONSTRAINT "FK_400664fad260d8fa50ecb78ffe6"`);
+        await queryRunner.query(`ALTER TABLE "income_records" DROP CONSTRAINT "FK_faa2f5fe39ca82c6563f16e6574"`);
+        await queryRunner.query(`ALTER TABLE "income_records" DROP CONSTRAINT "FK_db868432b42e2a89dc23f595c0a"`);
+        await queryRunner.query(`DROP TABLE "users"`);
+        await queryRunner.query(`DROP TYPE "public"."users_pay_cycle_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_rules_user_active"`);
+        await queryRunner.query(`DROP TABLE "rules"`);
+        await queryRunner.query(`DROP TYPE "public"."rules_trigger_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_insights_user_unread"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_insights_type"`);
+        await queryRunner.query(`DROP TABLE "insights"`);
+        await queryRunner.query(`DROP TYPE "public"."insights_priority_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."insights_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_goals_user_status"`);
+        await queryRunner.query(`DROP TABLE "goals"`);
+        await queryRunner.query(`DROP TYPE "public"."goals_status_enum"`);
+        await queryRunner.query(`DROP TABLE "goal_contributions"`);
+        await queryRunner.query(`DROP TYPE "public"."goal_contributions_source_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_budgets_user_period"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_budgets_category"`);
+        await queryRunner.query(`DROP TABLE "budgets"`);
+        await queryRunner.query(`DROP TYPE "public"."budgets_period_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_expenses_user_date"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_expenses_category"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_expenses_method"`);
+        await queryRunner.query(`DROP TABLE "expenses"`);
+        await queryRunner.query(`DROP TYPE "public"."expenses_source_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."expenses_payment_method_enum"`);
+        await queryRunner.query(`DROP TABLE "cash_accounts"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_cash_tx_account_date"`);
+        await queryRunner.query(`DROP TABLE "cash_transactions"`);
+        await queryRunner.query(`DROP TYPE "public"."cash_transactions_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_categories_user_type"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_categories_parent"`);
+        await queryRunner.query(`DROP TABLE "categories"`);
+        await queryRunner.query(`DROP TYPE "public"."categories_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_incomes_user_active"`);
+        await queryRunner.query(`DROP TABLE "incomes"`);
+        await queryRunner.query(`DROP TYPE "public"."incomes_cycle_enum"`);
+        await queryRunner.query(`DROP TYPE "public"."incomes_type_enum"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_income_records_user_date"`);
+        await queryRunner.query(`DROP TABLE "income_records"`);
+    }
+
+}

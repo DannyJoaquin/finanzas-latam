@@ -1,0 +1,23 @@
+# Backend artifacts
+backend/node_modules/
+backend/dist/
+backend/.env
+
+# Flutter artifacts
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.packages
+
+# Docker
+.env
+
+# Editor
+.vscode/
+*.iml
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
