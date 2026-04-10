@@ -1,4 +1,4 @@
-package com.finanzaslatam.finanzas_latam
+package com.zentri.zentri
 
 import io.flutter.embedding.android.FlutterActivity
 

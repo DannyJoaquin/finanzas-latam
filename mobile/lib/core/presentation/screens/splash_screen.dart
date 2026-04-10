@@ -41,7 +41,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Icon(Icons.account_balance_wallet, size: 80, color: color),
             const SizedBox(height: 24),
             Text(
-              'Finanzas LATAM',
+              'Zentri',
               style: Theme.of(context)
                   .textTheme
                   .headlineMedium

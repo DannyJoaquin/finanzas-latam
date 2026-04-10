@@ -23,6 +23,7 @@ services:
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 30d
       ENCRYPTION_KEY: dev-32-char-key-change-in-prod!!
+      GOOGLE_CLIENT_ID: 642124641220-oh2b998fll013blsj104l8v0gmrpoko8.apps.googleusercontent.com
     command: npm run start:dev
     volumes:
       - ./backend/src:/app/src

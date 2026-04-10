@@ -34,7 +34,7 @@ export class User {
   @Column({ length: 20, nullable: true })
   phone: string;
 
-  @Column({ name: 'password_hash', length: 255, nullable: true })
+  @Column({ name: 'password_hash', type: 'varchar', length: 255, nullable: true })
   @Exclude()
   passwordHash: string | null;
 
@@ -81,10 +81,10 @@ export class User {
   emailVerified: boolean;
 
   // OAuth provider fields (null for email/password users)
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   provider: string | null;
 
-  @Column({ name: 'provider_id', length: 255, nullable: true })
+  @Column({ name: 'provider_id', type: 'varchar', length: 255, nullable: true })
   providerId: string | null;
 
   @Column({ name: 'is_active', default: true })

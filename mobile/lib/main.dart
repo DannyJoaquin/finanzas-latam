@@ -28,7 +28,7 @@ class FinanzasApp extends ConsumerWidget {
     final theme = ref.watch(themeNotifierProvider);
 
     return MaterialApp.router(
-      title: 'Finanzas LATAM',
+      title: 'Zentri',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

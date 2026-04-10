@@ -162,7 +162,7 @@ class SettingsScreen extends ConsumerWidget {
           // Version
           const Center(
             child: Text(
-              'Finanzas LATAM v1.0.0',
+              'Zentri v1.0.0',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),

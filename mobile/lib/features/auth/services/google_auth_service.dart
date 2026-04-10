@@ -10,10 +10,8 @@ class GoogleAuthService {
   GoogleAuthService({String? serverClientId})
       : _googleSignIn = GoogleSignIn(
           scopes: ['email', 'profile'],
-          serverClientId: serverClientId ?? const String.fromEnvironment(
-            'GOOGLE_CLIENT_ID',
-            defaultValue: '',
-          ),
+          serverClientId: serverClientId ??
+              '642124641220-oh2b998fll013blsj104l8v0gmrpoko8.apps.googleusercontent.com',
         );
 
   final GoogleSignIn _googleSignIn;
