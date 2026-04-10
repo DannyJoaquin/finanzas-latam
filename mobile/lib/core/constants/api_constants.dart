@@ -35,7 +35,9 @@ class ApiConstants {
   // Analytics
   static const String dashboard = '/analytics/dashboard';
   static const String spendingTrends = '/analytics/spending-trends';
+  static const String paymentMethodTrends = '/analytics/payment-method-trends';
   static const String expensesSummary2 = '/expenses/summary';
+  static const String expensesSummaryByMethod = '/expenses/summary-by-method';
   static const String simulation = '/analytics/simulation';
 
   // Insights
@@ -43,4 +45,8 @@ class ApiConstants {
 
   // Rules
   static const String rules = '/rules';
+
+  // Credit Cards
+  static const String creditCards = '/credit-cards';
+  static const String creditCardsSummary = '/credit-cards/summary';
 }

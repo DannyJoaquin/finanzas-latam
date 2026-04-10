@@ -16,6 +16,7 @@ import '../../features/goals/presentation/screens/goals_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/cash/presentation/screens/cash_screen.dart';
+import '../../features/credit_cards/presentation/screens/credit_cards_screen.dart';
 import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/app_shell.dart';
 
@@ -36,6 +37,7 @@ class AppRoutes {
   static const analytics = '/analytics';
   static const settings = '/settings';
   static const cash = '/cash';
+  static const creditCards = '/credit-cards';
 }
 
 // A ChangeNotifier that GoRouter uses as refreshListenable.
@@ -111,6 +113,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: AppRoutes.analytics, builder: (c, s) => const AnalyticsScreen()),
           GoRoute(path: AppRoutes.settings, builder: (c, s) => const SettingsScreen()),
           GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
+          GoRoute(path: AppRoutes.creditCards, builder: (c, s) => const CreditCardsScreen()),
         ],
       ),
     ],

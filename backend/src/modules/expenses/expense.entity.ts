@@ -11,6 +11,7 @@ import {
 import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { CashAccount } from '../cash/cash-account.entity';
+import { CreditCard } from '../credit-cards/credit-card.entity';
 
 export enum PaymentMethod {
   CASH = 'cash',
@@ -95,6 +96,13 @@ export class Expense {
   @ManyToOne(() => CashAccount, { nullable: true })
   @JoinColumn({ name: 'cash_account_id' })
   cashAccount: CashAccount;
+
+  @Column({ name: 'credit_card_id', nullable: true })
+  creditCardId: string | null;
+
+  @ManyToOne(() => CreditCard, { nullable: true })
+  @JoinColumn({ name: 'credit_card_id' })
+  creditCard: CreditCard | null;
 
   @Column({ type: 'enum', enum: ExpenseSource, default: ExpenseSource.MANUAL })
   source: ExpenseSource;

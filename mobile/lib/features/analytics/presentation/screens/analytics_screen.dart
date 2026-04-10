@@ -51,6 +51,39 @@ class CategorySummary {
       );
 }
 
+class MethodSummaryItem {
+  const MethodSummaryItem({required this.method, required this.amount, required this.percentage});
+  final String method;
+  final double amount;
+  final double percentage;
+
+  factory MethodSummaryItem.fromJson(Map<String, dynamic> j) => MethodSummaryItem(
+        method: j['method'] as String? ?? '',
+        amount: (j['amount'] as num? ?? 0).toDouble(),
+        percentage: (j['percentage'] as num? ?? 0).toDouble(),
+      );
+}
+
+class PaymentTrendMonth {
+  const PaymentTrendMonth({
+    required this.month,
+    required this.cash,
+    required this.cardDebit,
+    required this.cardCredit,
+  });
+  final String month;
+  final double cash;
+  final double cardDebit;
+  final double cardCredit;
+
+  factory PaymentTrendMonth.fromJson(Map<String, dynamic> j) => PaymentTrendMonth(
+        month: j['month'] as String? ?? '',
+        cash: (j['cash'] as num? ?? 0).toDouble(),
+        cardDebit: (j['card_debit'] as num? ?? 0).toDouble(),
+        cardCredit: (j['card_credit'] as num? ?? 0).toDouble(),
+      );
+}
+
 // ── Providers ─────────────────────────────────────────────────────────────────
 final trendsProvider = FutureProvider.autoDispose<List<TrendData>>((ref) async {
   final dio = ref.watch(dioProvider);
@@ -95,6 +128,30 @@ final expenseSummaryProvider = FutureProvider.autoDispose<List<CategorySummary>>
   }).toList();
 });
 
+final methodSummaryProvider = FutureProvider.autoDispose<List<MethodSummaryItem>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final now = DateTime.now();
+  final start = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+  final lastDay = DateTime(now.year, now.month + 1, 0);
+  final end =
+      '${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}';
+  final resp = await dio.get(ApiConstants.expensesSummaryByMethod,
+      queryParameters: {'startDate': start, 'endDate': end});
+  final data = resp.data as Map<String, dynamic>?;
+  final items = data?['breakdown'] as List<dynamic>? ?? [];
+  return items
+      .map((e) => MethodSummaryItem.fromJson(e as Map<String, dynamic>))
+      .where((e) => e.amount > 0)
+      .toList();
+});
+
+final paymentTrendsProvider = FutureProvider.autoDispose<List<PaymentTrendMonth>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final resp = await dio.get(ApiConstants.paymentMethodTrends);
+  final items = resp.data as List<dynamic>? ?? [];
+  return items.map((e) => PaymentTrendMonth.fromJson(e as Map<String, dynamic>)).toList();
+});
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
@@ -110,7 +167,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -130,6 +187,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
             Tab(text: 'Resumen'),
             Tab(text: 'Tendencias'),
             Tab(text: 'Anomalías'),
+            Tab(text: 'Métodos'),
           ],
         ),
       ),
@@ -139,6 +197,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
           _SummaryTab(),
           _TrendsTab(),
           _AnomaliesTab(),
+          _MethodsTab(),
         ],
       ),
     );
@@ -556,6 +615,240 @@ class _AnomaliesTab extends ConsumerWidget {
                 );
               },
             ),
+    );
+  }
+}
+
+// ── Methods tab ───────────────────────────────────────────────────────────────
+
+const _methodLabels = <String, String>{
+  'cash': 'Efectivo',
+  'card_debit': 'Débito',
+  'card_credit': 'Crédito',
+  'transfer': 'Transf.',
+  'other': 'Otro',
+};
+
+const _methodColors = <String, Color>{
+  'cash': Color(0xFF4CAF50),
+  'card_debit': Color(0xFF2196F3),
+  'card_credit': Color(0xFFFF9800),
+  'transfer': Color(0xFF9C27B0),
+  'other': Color(0xFF9E9E9E),
+};
+
+class _MethodsTab extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final methodAsync = ref.watch(methodSummaryProvider);
+    final trendsAsync = ref.watch(paymentTrendsProvider);
+    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.refresh(methodSummaryProvider.future);
+        ref.refresh(paymentTrendsProvider.future);
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // ── Section 1: Distribution this month ──
+          Text('Distribución este mes',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          methodAsync.when(
+            loading: () => const Center(heightFactor: 3, child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (items) {
+              if (items.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.credit_card_off_outlined, size: 48, color: Colors.grey),
+                        SizedBox(height: 12),
+                        Text('Sin gastos este mes', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              final total = items.fold(0.0, (s, i) => s + i.amount);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 200,
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 45,
+                        sections: items.asMap().entries.map((e) {
+                          final color = _methodColors[e.value.method] ?? const Color(0xFF9E9E9E);
+                          return PieChartSectionData(
+                            color: color,
+                            value: e.value.amount,
+                            title: '${e.value.percentage.toStringAsFixed(0)}%',
+                            radius: 65,
+                            titleStyle: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'Total: ${fmt.format(total)}',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...items.map((item) {
+                    final color = _methodColors[item.method] ?? const Color(0xFF9E9E9E);
+                    final label = _methodLabels[item.method] ?? item.method;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(label, style: const TextStyle(fontSize: 13))),
+                          Text(fmt.format(item.amount),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${item.percentage.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 28),
+          // ── Section 2: 6-month trend ──
+          Text('Últimos 6 meses',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          trendsAsync.when(
+            loading: () => const Center(heightFactor: 3, child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (months) {
+              if (months.isEmpty) return const SizedBox.shrink();
+
+              final maxVal = months.fold(0.0, (m, t) {
+                final v = [t.cash, t.cardDebit, t.cardCredit].reduce((a, b) => a > b ? a : b);
+                return v > m ? v : m;
+              });
+
+              final barGroups = months.asMap().entries.map((e) {
+                return BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: e.value.cash,
+                      color: _methodColors['cash']!,
+                      width: 10,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    BarChartRodData(
+                      toY: e.value.cardDebit,
+                      color: _methodColors['card_debit']!,
+                      width: 10,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    BarChartRodData(
+                      toY: e.value.cardCredit,
+                      color: _methodColors['card_credit']!,
+                      width: 10,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                  ],
+                );
+              }).toList();
+
+              // Short month labels: "Jan", "Feb", etc.
+              final labels = months.map((m) {
+                final parts = m.month.split('-');
+                if (parts.length < 2) return m.month;
+                final monthNum = int.tryParse(parts[1]) ?? 1;
+                const abbr = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                return abbr[monthNum];
+              }).toList();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 200,
+                    child: BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: maxVal > 0 ? maxVal * 1.3 : 100,
+                        barGroups: barGroups,
+                        titlesData: FlTitlesData(
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 28,
+                              getTitlesWidget: (v, _) {
+                                final i = v.toInt();
+                                if (i < 0 || i >= labels.length) return const SizedBox();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(labels[i], style: const TextStyle(fontSize: 10)),
+                                );
+                              },
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              getTitlesWidget: (v, _) => Text(
+                                'L ${v.toInt()}',
+                                style: const TextStyle(fontSize: 9),
+                              ),
+                            ),
+                          ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        gridData: const FlGridData(show: true),
+                        borderData: FlBorderData(show: false),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _Legend(color: _methodColors['cash']!, label: 'Efectivo'),
+                      const SizedBox(width: 14),
+                      _Legend(color: _methodColors['card_debit']!, label: 'Débito'),
+                      const SizedBox(width: 14),
+                      _Legend(color: _methodColors['card_credit']!, label: 'Crédito'),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }

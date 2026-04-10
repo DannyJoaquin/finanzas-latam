@@ -24,6 +24,7 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { RulesModule } from './modules/rules/rules.module';
+import { CreditCardsModule } from './modules/credit-cards/credit-cards.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 
 // Jobs
@@ -91,6 +92,7 @@ import { Expense } from './modules/expenses/expense.entity';
     AnalyticsModule,
     InsightsModule,
     RulesModule,
+    CreditCardsModule,
   ],
   providers: [
     // Global JWT guard — all routes require auth unless @Public()

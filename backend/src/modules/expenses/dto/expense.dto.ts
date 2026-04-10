@@ -50,6 +50,10 @@ export class CreateExpenseDto {
   cashAccountId?: string;
 
   @IsOptional()
+  @IsUUID()
+  creditCardId?: string;
+
+  @IsOptional()
   @IsEnum(ExpenseSource)
   source?: ExpenseSource;
 }
@@ -79,6 +83,10 @@ export class UpdateExpenseDto {
 
   @IsOptional()
   tags?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  creditCardId?: string;
 }
 
 export class FilterExpensesDto {

@@ -7,6 +7,8 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../providers/expenses_provider.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../features/credit_cards/models/credit_card_model.dart';
+import '../../../../features/credit_cards/providers/credit_cards_provider.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({super.key});
@@ -22,6 +24,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   String? _selectedCategoryId;
   String _paymentMethod = 'cash';
+  String? _selectedCreditCardId;
   DateTime _date = DateTime.now();
   bool _saving = false;
 
@@ -67,6 +70,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         'categoryId': _selectedCategoryId,
         'paymentMethod': _paymentMethod,
         'date': DateFormat('yyyy-MM-dd').format(_date),
+        if (_paymentMethod == 'card_credit' && _selectedCreditCardId != null)
+          'creditCardId': _selectedCreditCardId,
       });
       ref.invalidate(expensesProvider);
       if (mounted) {
@@ -153,8 +158,48 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               items: _payMethods.entries
                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                   .toList(),
-              onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+              onChanged: (v) => setState(() {
+                _paymentMethod = v ?? 'cash';
+                _selectedCreditCardId = null;
+              }),
             ),
+            // Card selector — only when card_credit
+            if (_paymentMethod == 'card_credit') ...[  
+              const SizedBox(height: 16),
+              ref.watch(creditCardsProvider).when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (cards) => cards.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF9800).withAlpha(20),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: const Color(0xFFFF9800).withAlpha(80)),
+                        ),
+                        child: const Text(
+                          'No tienes tarjetas registradas. Agrégalas en la sección de Tarjetas.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: _selectedCreditCardId,
+                        decoration: const InputDecoration(
+                          labelText: 'Tarjeta de crédito',
+                          prefixIcon: Icon(Icons.credit_card_outlined),
+                        ),
+                        items: cards
+                            .map((c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Text(c.name),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _selectedCreditCardId = v),
+                      ),
+              ),
+            ],
             const SizedBox(height: 16),
             // Date picker
             ListTile(

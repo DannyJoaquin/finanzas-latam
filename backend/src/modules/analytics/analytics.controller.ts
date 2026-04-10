@@ -17,6 +17,11 @@ export class AnalyticsController {
     return this.analyticsService.getSpendingTrends(user.id);
   }
 
+  @Get('payment-method-trends')
+  getPaymentMethodTrends(@CurrentUser() user: User) {
+    return this.analyticsService.getPaymentMethodTrends(user.id);
+  }
+
   @Get('anomalies')
   getAnomalies(@CurrentUser() user: User) {
     return this.analyticsService.detectAnomalies(user.id);

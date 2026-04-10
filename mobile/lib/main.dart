@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/storage_keys.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,9 @@ void main() async {
 
   // Optionally open preference boxes on startup
   await Hive.openBox<String>(StorageKeys.preferencesBox);
+
+  // Initialize local notifications
+  await NotificationService.instance.initialize();
 
   runApp(const ProviderScope(child: FinanzasApp()));
 }

@@ -12,14 +12,16 @@ import '../../../../core/router/app_router.dart';
 // ── Filter state ──────────────────────────────────────────────────────────────
 
 class _ExpenseFilter {
-  const _ExpenseFilter({this.startDate, this.endDate});
+  const _ExpenseFilter({this.startDate, this.endDate, this.paymentMethod});
   final DateTime? startDate;
   final DateTime? endDate;
-  bool get isActive => startDate != null || endDate != null;
-  _ExpenseFilter copyWith({DateTime? startDate, DateTime? endDate, bool clearStart = false, bool clearEnd = false}) {
+  final String? paymentMethod;
+  bool get isActive => startDate != null || endDate != null || paymentMethod != null;
+  _ExpenseFilter copyWith({DateTime? startDate, DateTime? endDate, String? paymentMethod, bool clearStart = false, bool clearEnd = false, bool clearMethod = false}) {
     return _ExpenseFilter(
       startDate: clearStart ? null : (startDate ?? this.startDate),
       endDate: clearEnd ? null : (endDate ?? this.endDate),
+      paymentMethod: clearMethod ? null : (paymentMethod ?? this.paymentMethod),
     );
   }
 }
@@ -93,6 +95,11 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                 .where((e) =>
                     !DateTime.parse(e.date)
                         .isAfter(filter.endDate!.add(const Duration(days: 1))))
+                .toList();
+          }
+          if (filter.paymentMethod != null) {
+            filtered = filtered
+                .where((e) => e.paymentMethod == filter.paymentMethod)
                 .toList();
           }
           if (filtered.isEmpty) {
@@ -191,6 +198,15 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     final dFmt = DateFormat('dd/MM/yyyy', 'en_US');
     DateTime? tmpStart = ref.read(_expensesFilterProvider).startDate;
     DateTime? tmpEnd = ref.read(_expensesFilterProvider).endDate;
+    String? tmpMethod = ref.read(_expensesFilterProvider).paymentMethod;
+
+    const payMethods = <String, String>{
+      'cash': 'Efectivo',
+      'card_debit': 'Débito',
+      'card_credit': 'Crédito',
+      'transfer': 'Transferencia',
+      'other': 'Otro',
+    };
 
     await showModalBottomSheet(
       context: context,
@@ -214,6 +230,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       setState(() {
                         tmpStart = null;
                         tmpEnd = null;
+                        tmpMethod = null;
                       });
                     },
                     child: const Text('Limpiar'),
@@ -248,11 +265,26 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                   if (picked != null) setState(() => tmpEnd = picked);
                 },
               ),
+              const SizedBox(height: 16),
+              Text('Método de pago', style: Theme.of(ctx).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: payMethods.entries.map((entry) {
+                  final selected = tmpMethod == entry.key;
+                  return FilterChip(
+                    label: Text(entry.value),
+                    selected: selected,
+                    onSelected: (v) => setState(() => tmpMethod = v ? entry.key : null),
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () {
                   ref.read(_expensesFilterProvider.notifier).state =
-                      _ExpenseFilter(startDate: tmpStart, endDate: tmpEnd);
+                      _ExpenseFilter(startDate: tmpStart, endDate: tmpEnd, paymentMethod: tmpMethod);
                   Navigator.pop(ctx);
                 },
                 child: const Text('Aplicar filtros'),

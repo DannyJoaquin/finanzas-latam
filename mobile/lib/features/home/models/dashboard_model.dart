@@ -57,6 +57,7 @@ class DashboardModel {
     required this.topCategories,
     required this.recentExpenses,
     required this.insights,
+    this.creditCardTotal = 0,
   });
 
   final String periodStart;
@@ -72,6 +73,7 @@ class DashboardModel {
   final List<CategorySpend> topCategories;
   final List<RecentExpense> recentExpenses;
   final List<InsightModel> insights;
+  final double creditCardTotal;
 
   factory DashboardModel.fromJson(
     Map<String, dynamic> j, {
@@ -124,6 +126,7 @@ class DashboardModel {
       topCategories: topCategories,
       recentExpenses: recentExpenses,
       insights: const <InsightModel>[],
+      creditCardTotal: double.parse((j['creditCardTotal'] ?? 0).toString()),
     );
   }
 }

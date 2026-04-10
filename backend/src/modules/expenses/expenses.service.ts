@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, ILike, MoreThan, Repository } from 'typeorm';
-import { Expense } from './expense.entity';
+import { Expense, PaymentMethod } from './expense.entity';
 import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/expense.dto';
 import { parsePagination, buildMeta } from '../../common/utils/pagination.util';
 
@@ -115,5 +115,35 @@ export class ExpensesService {
 
     const grandTotal = result.reduce((sum, r) => sum + parseFloat(r.total ?? '0'), 0);
     return { categories: result, grandTotal };
+  }
+
+  async getSummaryByMethod(userId: string, startDate?: string, endDate?: string) {
+    const now = new Date();
+    const effectiveStart =
+      startDate ||
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const effectiveEnd = endDate || now.toISOString().split('T')[0];
+
+    const result = await this.expenseRepo
+      .createQueryBuilder('e')
+      .select('e.paymentMethod', 'method')
+      .addSelect('SUM(e.amount)', 'total')
+      .where('e.userId = :userId', { userId })
+      .andWhere('e.date BETWEEN :start AND :end', { start: effectiveStart, end: effectiveEnd })
+      .groupBy('e.paymentMethod')
+      .orderBy('total', 'DESC')
+      .getRawMany<{ method: string; total: string }>();
+
+    const grandTotal = result.reduce((sum, r) => sum + parseFloat(r.total ?? '0'), 0);
+    const breakdown = result.map((r) => {
+      const amount = parseFloat(r.total ?? '0');
+      return {
+        method: r.method as PaymentMethod,
+        amount,
+        percentage: grandTotal > 0 ? Math.round((amount / grandTotal) * 1000) / 10 : 0,
+      };
+    });
+
+    return { breakdown, total: grandTotal };
   }
 }

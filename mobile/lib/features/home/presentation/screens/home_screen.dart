@@ -9,6 +9,8 @@ import '../../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../../cash/providers/cash_provider.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../../../core/constants/api_constants.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -87,6 +89,10 @@ class HomeScreen extends ConsumerWidget {
               _BalanceCard(dash: dash),
               const SizedBox(height: 12),
               _CashPreviewCard(),
+              if (dash.creditCardTotal > 0) ...[
+                const SizedBox(height: 12),
+                _CreditCardDebtCard(amount: dash.creditCardTotal, periodStart: dash.periodStart, periodEnd: dash.periodEnd),
+              ],
               const SizedBox(height: 16),
               _QuickActions(),
               const SizedBox(height: 16),
@@ -525,6 +531,256 @@ class _ShimmerText extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.withAlpha(60),
         borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+}
+
+// ── Credit card debt card ─────────────────────────────────────────────────────
+
+class _CreditExpensesParams {
+  const _CreditExpensesParams({required this.start, required this.end});
+  final String start;
+  final String end;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _CreditExpensesParams && other.start == start && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(start, end);
+}
+
+final _creditExpensesProvider =
+    FutureProvider.autoDispose.family<List<ExpenseModel>, _CreditExpensesParams>(
+  (ref, params) async {
+    final dio = ref.watch(dioProvider);
+    final resp = await dio.get(ApiConstants.expenses, queryParameters: {
+      'paymentMethod': 'card_credit',
+      'startDate': params.start,
+      'endDate': params.end,
+      'limit': 100,
+    });
+    final items = resp.data['items'] as List<dynamic>? ?? [];
+    return items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+  },
+);
+
+class _CreditCardDebtCard extends StatelessWidget {
+  const _CreditCardDebtCard({required this.amount, required this.periodStart, required this.periodEnd});
+  final double amount;
+  final String periodStart;
+  final String periodEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    const cardColor = Color(0xFFFF9800);
+
+    return GestureDetector(
+      onTap: () => context.go(AppRoutes.creditCards),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cardColor.withAlpha(20),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cardColor.withAlpha(80)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.credit_card_outlined, color: cardColor, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Deuda tarjeta de crédito',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: cardColor,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    fmt.format(amount),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: cardColor),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Gastos cargados a crédito este período',
+                    style: TextStyle(fontSize: 11, color: cardColor.withAlpha(180)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.info_outline, color: cardColor.withAlpha(160), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showCreditDetail(BuildContext context, String periodStart, String periodEnd, double total) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => _CreditDetailSheet(
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      total: total,
+    ),
+  );
+}
+
+class _CreditDetailSheet extends ConsumerWidget {
+  const _CreditDetailSheet({
+    required this.periodStart,
+    required this.periodEnd,
+    required this.total,
+  });
+  final String periodStart;
+  final String periodEnd;
+  final double total;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    const cardColor = Color(0xFFFF9800);
+
+    // Fetch credit card expenses for the current period
+    final creditExpensesAsync = ref.watch(_creditExpensesProvider(
+      _CreditExpensesParams(start: periodStart, end: periodEnd),
+    ));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      maxChildSize: 0.9,
+      minChildSize: 0.35,
+      expand: false,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.credit_card_outlined, color: cardColor, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Deuda tarjeta de crédito',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cardColor,
+                            ),
+                      ),
+                      Text(
+                        'Del $periodStart al $periodEnd',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  fmt.format(total),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: cardColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cardColor.withAlpha(15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cardColor.withAlpha(40)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: cardColor.withAlpha(200)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Este monto es lo que deberás pagar a tu banco en el próximo estado de cuenta.',
+                    style: TextStyle(fontSize: 12, color: cardColor.withAlpha(200)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: creditExpensesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (expenses) {
+                if (expenses.isEmpty) {
+                  return const Center(child: Text('Sin gastos de crédito en este período'));
+                }
+                return ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: expenses.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
+                  itemBuilder: (_, i) {
+                    final e = expenses[i];
+                    final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: cardColor.withAlpha(20),
+                        child: isEmoji
+                            ? Text(e.categoryIcon)
+                            : Icon(
+                                materialIconFromString(e.categoryIcon),
+                                size: 18,
+                                color: cardColor,
+                              ),
+                      ),
+                      title: Text(
+                        e.description.isEmpty ? e.categoryName : e.description,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        '${e.categoryName} · ${e.date}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: Text(
+                        fmt.format(e.amount),
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: cardColor),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

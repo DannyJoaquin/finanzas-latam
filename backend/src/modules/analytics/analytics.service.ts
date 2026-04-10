@@ -17,6 +17,7 @@ export interface DashboardData {
   availableBalance: number;
   todaySpent: number;
   cashRunoutDate: string | null;
+  creditCardTotal: number;
 }
 
 export interface SpendingTrend {
@@ -61,7 +62,7 @@ export class AnalyticsService {
     const endStr = period.periodEnd.toISOString().split('T')[0];
     const todayStr = today.toISOString().split('T')[0];
 
-    const [spentResult, todayResult] = await Promise.all([
+    const [spentResult, todayResult, creditResult] = await Promise.all([
       this.expenseRepo
         .createQueryBuilder('e')
         .select('COALESCE(SUM(e.amount), 0)', 'total')
@@ -73,6 +74,13 @@ export class AnalyticsService {
         .createQueryBuilder('e')
         .select('COALESCE(SUM(e.amount), 0)', 'total')
         .where('e.userId = :userId AND e.date = :today', { userId, today: todayStr })
+        .getRawOne<{ total: string }>(),
+      this.expenseRepo
+        .createQueryBuilder('e')
+        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .where('e.userId = :userId AND e.paymentMethod = :method AND e.date BETWEEN :start AND :end', {
+          userId, method: 'card_credit', start: startStr, end: endStr,
+        })
         .getRawOne<{ total: string }>(),
     ]);
 
@@ -99,6 +107,7 @@ export class AnalyticsService {
 
     const totalSpent = parseFloat(spentResult?.total ?? '0');
     const todaySpent = parseFloat(todayResult?.total ?? '0');
+    const creditCardTotal = parseFloat(creditResult?.total ?? '0');
     const available = totalIncome - totalSpent;
     const safeDailySpend = daysRemaining > 0 ? available / daysRemaining : 0;
 
@@ -128,6 +137,7 @@ export class AnalyticsService {
       availableBalance: available,
       todaySpent,
       cashRunoutDate,
+      creditCardTotal,
     };
   }
 
@@ -211,8 +221,44 @@ export class AnalyticsService {
     return anomalies.sort((a, b) => b.zScore - a.zScore);
   }
 
-  async getSimulation(
-    userId: string,
+  async getPaymentMethodTrends(userId: string): Promise<{ month: string; cash: number; card_debit: number; card_credit: number; transfer: number; other: number }[]> {
+    const today = new Date();
+    // Build last 6 months (inclusive of current month)
+    const months: { start: string; end: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth(); // 0-based
+      const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      const label = `${year}-${String(month + 1).padStart(2, '0')}`;
+      months.push({ start, end, label });
+    }
+
+    const results = await Promise.all(
+      months.map(async ({ start, end, label }) => {
+        const raw = await this.expenseRepo
+          .createQueryBuilder('e')
+          .select('e.paymentMethod', 'method')
+          .addSelect('COALESCE(SUM(e.amount), 0)', 'total')
+          .where('e.userId = :userId AND e.date BETWEEN :start AND :end', { userId, start, end })
+          .groupBy('e.paymentMethod')
+          .getRawMany<{ method: string; total: string }>();
+
+        const row: Record<string, number> = { cash: 0, card_debit: 0, card_credit: 0, transfer: 0, other: 0 };
+        for (const r of raw) {
+          const key = r.method in row ? r.method : 'other';
+          row[key] = parseFloat(r.total ?? '0');
+        }
+        return { month: label, ...row } as { month: string; cash: number; card_debit: number; card_credit: number; transfer: number; other: number };
+      }),
+    );
+
+    return results;
+  }
+
+  async getSimulation(    userId: string,
     categoryId: string,
     reductionPct: number,
   ): Promise<{ currentMonthlyAvg: number; projectedSavings: number; annualSavings: number }> {

@@ -34,6 +34,15 @@ export class ExpensesController {
     return this.expensesService.getSummary(user.id, startDate, endDate);
   }
 
+  @Get('summary-by-method')
+  getSummaryByMethod(
+    @CurrentUser() user: User,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.expensesService.getSummaryByMethod(user.id, startDate, endDate);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.expensesService.findOne(user.id, id);
