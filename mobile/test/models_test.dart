@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:finanzas_latam/features/home/models/dashboard_model.dart';
+import 'package:zentri/features/home/models/dashboard_model.dart';
 
 void main() {
   // ──────────────────────────────────────────────────────────────

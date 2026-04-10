@@ -5,10 +5,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'package:finanzas_latam/main.dart';
-import 'package:finanzas_latam/core/constants/storage_keys.dart';
-import 'package:finanzas_latam/features/auth/providers/auth_provider.dart';
-import 'package:finanzas_latam/features/auth/models/auth_models.dart';
+import 'package:zentri/main.dart';
+import 'package:zentri/core/constants/storage_keys.dart';
+import 'package:zentri/features/auth/providers/auth_provider.dart';
+import 'package:zentri/features/auth/models/auth_models.dart';
 
 class _FakePathProvider extends Fake
     with MockPlatformInterfaceMixin

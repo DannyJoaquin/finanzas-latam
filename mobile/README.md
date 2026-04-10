@@ -1,4 +1,4 @@
-# finanzas_latam
+# zentri
 
 A new Flutter project.
 

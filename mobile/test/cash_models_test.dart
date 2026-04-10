@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:finanzas_latam/features/cash/models/cash_models.dart';
+import 'package:zentri/features/cash/models/cash_models.dart';
 
 void main() {
   // ──────────────────────────────────────────────────────────────
