@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../models/cash_models.dart';
 import '../../providers/cash_provider.dart';
 
@@ -14,12 +15,17 @@ class CashScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final accountsAsync = ref.watch(cashAccountsProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Efectivo')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
+      ),
       body: accountsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(cashAccountsProvider)),
         data: (accounts) {
           if (accounts.isEmpty) {
             return _EmptyState(onCreated: () => ref.invalidate(cashAccountsProvider));
@@ -27,7 +33,7 @@ class CashScreen extends ConsumerWidget {
           // Show the default account, or the first one
           final account =
               accounts.firstWhere((a) => a.isDefault, orElse: () => accounts.first);
-          return _AccountView(account: account, allAccounts: accounts);
+          return _AccountView(account: account, allAccounts: accounts, monthTitle: monthTitle);
         },
       ),
     );
@@ -117,9 +123,10 @@ class _EmptyStateState extends ConsumerState<_EmptyState> {
 // ── Account view ──────────────────────────────────────────────────────────────
 
 class _AccountView extends ConsumerWidget {
-  const _AccountView({required this.account, required this.allAccounts});
+  const _AccountView({required this.account, required this.allAccounts, required this.monthTitle});
   final CashAccountModel account;
   final List<CashAccountModel> allAccounts;
+  final String monthTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -133,8 +140,23 @@ class _AccountView extends ConsumerWidget {
         ref.invalidate(cashTransactionsProvider(account.id));
       },
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          Text(
+            'Efectivo',
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$monthTitle · Cuenta principal',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
           // ── Wallet card ──
           _WalletCard(account: account, fmt: fmt),
           const SizedBox(height: 20),
@@ -252,6 +274,13 @@ class _WalletCard extends StatelessWidget {
           colors: [accountColor, accountColor.withAlpha(200)],
         ),
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withAlpha(16),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,8 +366,19 @@ class _TransactionTile extends StatelessWidget {
     final fmt =
         NumberFormat.currency(locale: 'en_US', symbol: '$currency ');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withAlpha(14),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

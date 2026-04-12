@@ -16,6 +16,7 @@ export enum InsightType {
   STREAK = 'streak',
   BUDGET_WARNING = 'budget_warning',
   PATTERN = 'pattern',
+  ACHIEVEMENT = 'achievement',
 }
 
 export enum InsightPriority {

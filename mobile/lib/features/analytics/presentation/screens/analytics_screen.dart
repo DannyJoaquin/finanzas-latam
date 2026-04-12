@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 class TrendData {
@@ -17,8 +19,8 @@ class TrendData {
 
   factory TrendData.fromJson(Map<String, dynamic> j) => TrendData(
         categoryName: j['categoryName'] as String? ?? '',
-        current: ((j['current'] ?? j['currentAmount']) as num? ?? 0).toDouble(),
-        previous: ((j['previous'] ?? j['previousAmount']) as num? ?? 0).toDouble(),
+        current: ((j['currentPeriodTotal'] ?? j['current'] ?? j['currentAmount']) as num? ?? 0).toDouble(),
+        previous: ((j['previousPeriodTotal'] ?? j['previous'] ?? j['previousAmount']) as num? ?? 0).toDouble(),
         changePercent: ((j['changePercent'] ?? j['change']) as num? ?? 0).toDouble(),
       );
 }
@@ -32,8 +34,8 @@ class AnomalyData {
 
   factory AnomalyData.fromJson(Map<String, dynamic> j) => AnomalyData(
         categoryName: j['categoryName'] as String? ?? '',
-        currentWeek: ((j['currentWeek'] ?? j['current']) as num? ?? 0).toDouble(),
-        avgWeek: ((j['avgWeek'] ?? j['average']) as num? ?? 0).toDouble(),
+        currentWeek: ((j['currentWeekTotal'] ?? j['currentWeek'] ?? j['current']) as num? ?? 0).toDouble(),
+        avgWeek: ((j['avgWeeklyTotal'] ?? j['avgWeek'] ?? j['average']) as num? ?? 0).toDouble(),
         zScore: (j['zScore'] as num? ?? 0).toDouble(),
       );
 }
@@ -178,26 +180,76 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Análisis'),
-        bottom: TabBar(
-          controller: _tab,
-          tabs: const [
-            Tab(text: 'Resumen'),
-            Tab(text: 'Tendencias'),
-            Tab(text: 'Anomalías'),
-            Tab(text: 'Métodos'),
-          ],
-        ),
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
       ),
-      body: TabBarView(
-        controller: _tab,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SummaryTab(),
-          _TrendsTab(),
-          _AnomaliesTab(),
-          _MethodsTab(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Análisis',
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$monthTitle · Tendencias y métricas',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).shadowColor.withAlpha(14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: TabBar(
+                controller: _tab,
+                tabs: const [
+                  Tab(text: 'Resumen'),
+                  Tab(text: 'Tendencias'),
+                  Tab(text: 'Anomalías'),
+                  Tab(text: 'Métodos'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              controller: _tab,
+              children: [
+                _SummaryTab(),
+                _TrendsTab(),
+                _AnomaliesTab(),
+                _MethodsTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -209,11 +261,11 @@ class _SummaryTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(expenseSummaryProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+    final fmt = ref.watch(currencyFmtProvider);
 
     return summaryAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(expenseSummaryProvider)),
       data: (cats) {
         if (cats.isEmpty) {
           return const Center(
@@ -294,11 +346,11 @@ class _TrendsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trendsAsync = ref.watch(trendsProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+    final fmt = ref.watch(currencyFmtProvider);
 
     return trendsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(trendsProvider)),
       data: (trends) {
         if (trends.isEmpty) {
           return const Center(
@@ -443,7 +495,7 @@ class _TrendsTab extends ConsumerWidget {
               children: [
                 _Legend(color: AppColors.neutral.withAlpha(120), label: 'Período anterior'),
                 const SizedBox(width: 16),
-                _Legend(color: AppColors.primary, label: 'Período actual'),
+                const _Legend(color: AppColors.primary, label: 'Período actual'),
               ],
             ),
             const SizedBox(height: 24),
@@ -544,7 +596,7 @@ class _AnomaliesTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final anomAsync = ref.watch(anomaliesProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+    final fmt = ref.watch(currencyFmtProvider);
 
     return anomAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -642,12 +694,14 @@ class _MethodsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final methodAsync = ref.watch(methodSummaryProvider);
     final trendsAsync = ref.watch(paymentTrendsProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+    final fmt = ref.watch(currencyFmtProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.refresh(methodSummaryProvider.future);
-        ref.refresh(paymentTrendsProvider.future);
+        await Future.wait([
+          ref.refresh(methodSummaryProvider.future),
+          ref.refresh(paymentTrendsProvider.future),
+        ]);
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -658,7 +712,7 @@ class _MethodsTab extends ConsumerWidget {
           const SizedBox(height: 12),
           methodAsync.when(
             loading: () => const Center(heightFactor: 3, child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
+            error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(methodSummaryProvider)),
             data: (items) {
               if (items.isEmpty) {
                 return const Padding(
@@ -744,7 +798,7 @@ class _MethodsTab extends ConsumerWidget {
           const SizedBox(height: 12),
           trendsAsync.when(
             loading: () => const Center(heightFactor: 3, child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
+            error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(paymentTrendsProvider)),
             data: (months) {
               if (months.isEmpty) return const SizedBox.shrink();
 

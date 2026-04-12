@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/storage_keys.dart';
+import 'core/services/fcm_service.dart';
 import 'core/services/notification_service.dart';
 
 void main() async {
@@ -20,7 +22,19 @@ void main() async {
   // Initialize local notifications
   await NotificationService.instance.initialize();
 
+  // Initialize Firebase if native config is present.
+  await _initializeFirebase();
+  await FcmService.instance.initialize();
+
   runApp(const ProviderScope(child: FinanzasApp()));
+}
+
+Future<void> _initializeFirebase() async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('[FCM] Firebase init skipped: $e');
+  }
 }
 
 class FinanzasApp extends ConsumerWidget {

@@ -11,6 +11,43 @@ import '../../../expenses/providers/expenses_provider.dart';
 import '../../../cash/providers/cash_provider.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
+
+class _TopActionButton extends StatelessWidget {
+  const _TopActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withAlpha(12),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(icon),
+        tooltip: tooltip,
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -19,6 +56,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashAsync = ref.watch(dashboardProvider);
     final insightsAsync = ref.watch(insightsProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
     final unreadCount = insightsAsync.valueOrNull
             ?.where((i) => !i.isRead && !i.isDismissed)
             .length ??
@@ -26,18 +65,19 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inicio'),
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart_outlined),
+          _TopActionButton(
+            icon: Icons.bar_chart_outlined,
             tooltip: 'Análisis',
             onPressed: () => context.go(AppRoutes.analytics),
           ),
           Stack(
             clipBehavior: Clip.none,
             children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
+              _TopActionButton(
+                icon: Icons.notifications_outlined,
                 tooltip: 'Alertas',
                 onPressed: () => _showNotificationsPanel(context, ref),
               ),
@@ -67,16 +107,17 @@ class HomeScreen extends ConsumerWidget {
                 ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
+          _TopActionButton(
+            icon: Icons.settings_outlined,
             tooltip: 'Ajustes',
             onPressed: () => context.go(AppRoutes.settings),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: dashAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(dashboardProvider)),
         data: (dash) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardProvider);
@@ -86,12 +127,27 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Text(
+                'Inicio',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$monthTitle · Resumen general',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
               _BalanceCard(dash: dash),
               const SizedBox(height: 12),
               _CashPreviewCard(),
               if (dash.creditCardTotal > 0) ...[
                 const SizedBox(height: 12),
-                _CreditCardDebtCard(amount: dash.creditCardTotal, periodStart: dash.periodStart, periodEnd: dash.periodEnd),
+                _CreditCardDebtCard(amount: dash.creditCardTotal, amountUSD: dash.creditCardTotalUSD, periodStart: dash.periodStart, periodEnd: dash.periodEnd),
               ],
               const SizedBox(height: 16),
               _QuickActions(),
@@ -157,21 +213,39 @@ class _NotificationsPanel extends ConsumerWidget {
                 insightsAsync.when(
                   data: (list) {
                     final unread = list.where((i) => !i.isRead).length;
-                    if (unread == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$unread',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
+                    final hasDismissible = list.isNotEmpty;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasDismissible)
+                          TextButton(
+                            onPressed: () async {
+                              await repo.dismissAllInsights();
+                              ref.invalidate(insightsProvider);
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              foregroundColor: Colors.grey,
+                            ),
+                            child: const Text('Limpiar todo', style: TextStyle(fontSize: 12)),
+                          ),
+                        if (unread > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$unread',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   },
                   loading: () => const SizedBox.shrink(),
@@ -184,7 +258,7 @@ class _NotificationsPanel extends ConsumerWidget {
           Expanded(
             child: insightsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(insightsProvider)),
               data: (insights) {
                 if (insights.isEmpty) {
                   return Padding(
@@ -279,7 +353,7 @@ class _InsightListTile extends StatelessWidget {
 }
 
 // �"?�"? Balance card �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
-class _BalanceCard extends StatelessWidget {
+class _BalanceCard extends ConsumerWidget {
   const _BalanceCard({required this.dash});
   final DashboardModel dash;
 
@@ -291,13 +365,34 @@ class _BalanceCard extends StatelessWidget {
     };
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
-    final theme = Theme.of(context);
-    final riskColor = _riskColor();
+  Color _readableRiskColor(BuildContext context) {
+    final base = _riskColor();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (!isDark) return base;
 
-    return Card(
+    // Increase contrast for warning tone in dark mode.
+    if (dash.riskLevel == 'yellow') return const Color(0xFFFFD54F);
+    return base;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = ref.watch(currencyFmtProvider);
+    final theme = Theme.of(context);
+    final riskColor = _readableRiskColor(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withAlpha(14),
+            blurRadius: 20,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -311,7 +406,7 @@ class _BalanceCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: riskColor.withAlpha(30),
+                    color: riskColor.withAlpha(42),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -319,7 +414,7 @@ class _BalanceCard extends StatelessWidget {
                       Icon(Icons.circle, size: 8, color: riskColor),
                       const SizedBox(width: 4),
                       Text(
-                        '${dash.daysRemaining}d restantes',
+                        '${dash.daysRemaining}d del ciclo',
                         style: TextStyle(
                             fontSize: 12,
                             color: riskColor,
@@ -380,7 +475,7 @@ class _PredictionRow extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: Text(
-              'Fondos podrían agotarse: ${dash.cashRunoutDate}',
+              'Al ritmo actual, fondos se agotarían: ${dash.cashRunoutDate}',
               style: TextStyle(
                   fontSize: 12,
                   color: riskColor,
@@ -398,7 +493,7 @@ class _PredictionRow extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: Text(
-              'Estimado de fondos hasta: ${dash.cashRunoutDate}',
+              'Al ritmo actual, fondos alcanzan hasta: ${dash.cashRunoutDate}',
               style: TextStyle(fontSize: 12, color: riskColor),
             ),
           ),
@@ -460,7 +555,14 @@ class _CashPreviewCard extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: theme.colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: theme.shadowColor.withAlpha(12),
+              blurRadius: 16,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -566,52 +668,75 @@ final _creditExpensesProvider =
   },
 );
 
-class _CreditCardDebtCard extends StatelessWidget {
-  const _CreditCardDebtCard({required this.amount, required this.periodStart, required this.periodEnd});
+class _CreditCardDebtCard extends ConsumerWidget {
+  const _CreditCardDebtCard({required this.amount, required this.amountUSD, required this.periodStart, required this.periodEnd});
   final double amount;
+  final double amountUSD;
   final String periodStart;
   final String periodEnd;
 
   @override
-  Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fmt = ref.watch(currencyFmtProvider);
     const cardColor = Color(0xFFFF9800);
 
     return GestureDetector(
-      onTap: () => context.go(AppRoutes.creditCards),
+      onTap: () => _showCreditDetail(context, periodStart, periodEnd, amount, amountUSD),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: cardColor.withAlpha(20),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cardColor.withAlpha(80)),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withAlpha(10),
+              blurRadius: 16,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(Icons.credit_card_outlined, color: cardColor, size: 22),
+            const Icon(Icons.credit_card_outlined, color: cardColor, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Deuda tarjeta de crédito',
+                  const Text(
+                    'Gastos con tarjeta de crédito',
                     style: TextStyle(
                         fontSize: 13,
                         color: cardColor,
                         fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    fmt.format(amount),
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                        color: cardColor),
-                  ),
+                  if (amountUSD > 0) ...[
+                    Text(
+                      fmt.format(amount),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          color: cardColor),
+                    ),
+                    Text(
+                      '+ ${NumberFormat.currency(locale: 'en_US', symbol: '\$ ').format(amountUSD)}',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: cardColor.withAlpha(200)),
+                    ),
+                  ] else
+                    Text(
+                      fmt.format(amount),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          color: cardColor),
+                    ),
                   const SizedBox(height: 2),
                   Text(
-                    'Gastos cargados a crédito este período',
+                    'Cargado a crédito este período',
                     style: TextStyle(fontSize: 11, color: cardColor.withAlpha(180)),
                   ),
                 ],
@@ -625,7 +750,13 @@ class _CreditCardDebtCard extends StatelessWidget {
   }
 }
 
-void _showCreditDetail(BuildContext context, String periodStart, String periodEnd, double total) {
+void _showCreditDetail(
+  BuildContext context,
+  String periodStart,
+  String periodEnd,
+  double total,
+  double totalUSD,
+) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -636,6 +767,7 @@ void _showCreditDetail(BuildContext context, String periodStart, String periodEn
       periodStart: periodStart,
       periodEnd: periodEnd,
       total: total,
+      totalUSD: totalUSD,
     ),
   );
 }
@@ -645,14 +777,16 @@ class _CreditDetailSheet extends ConsumerWidget {
     required this.periodStart,
     required this.periodEnd,
     required this.total,
+    required this.totalUSD,
   });
   final String periodStart;
   final String periodEnd;
   final double total;
+  final double totalUSD;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
     const cardColor = Color(0xFFFF9800);
 
     // Fetch credit card expenses for the current period
@@ -687,7 +821,7 @@ class _CreditDetailSheet extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Deuda tarjeta de crédito',
+                        'Gastos del período con crédito',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: cardColor,
@@ -700,14 +834,37 @@ class _CreditDetailSheet extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Text(
-                  fmt.format(total),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: cardColor,
+                if (totalUSD > 0)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        fmt.format(total),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: cardColor,
+                        ),
+                      ),
+                      Text(
+                        '+ ${NumberFormat.currency(locale: 'en_US', symbol: '\$ ').format(totalUSD)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cardColor.withAlpha(200),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    fmt.format(total),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: cardColor,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -725,7 +882,7 @@ class _CreditDetailSheet extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Este monto es lo que deberás pagar a tu banco en el próximo estado de cuenta.',
+                    'Total de gastos registrados con tarjeta de crédito durante este período presupuestario.',
                     style: TextStyle(fontSize: 12, color: cardColor.withAlpha(200)),
                   ),
                 ),
@@ -736,7 +893,7 @@ class _CreditDetailSheet extends ConsumerWidget {
           Expanded(
             child: creditExpensesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => AppErrorWidget(error: e),
               data: (expenses) {
                 if (expenses.isEmpty) {
                   return const Center(child: Text('Sin gastos de crédito en este período'));
@@ -771,7 +928,7 @@ class _CreditDetailSheet extends ConsumerWidget {
                         style: const TextStyle(fontSize: 12),
                       ),
                       trailing: Text(
-                        fmt.format(e.amount),
+                        currencyFmt(e.currency).format(e.amount),
                         style: const TextStyle(fontWeight: FontWeight.w600, color: cardColor),
                       ),
                     );
@@ -811,9 +968,9 @@ class _QuickActions extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         _ActionButton(
-          icon: Icons.account_balance_wallet_rounded,
-          label: 'Presupuesto',
-          onTap: () => context.go(AppRoutes.budgets),
+          icon: Icons.credit_card_outlined,
+          label: 'Tarjetas',
+          onTap: () => context.go(AppRoutes.creditCards),
         ),
       ],
     );
@@ -835,17 +992,24 @@ class _ActionButton extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).shadowColor.withAlpha(12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Icon(icon, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(height: 6),
             Text(label,
-                style: const TextStyle(fontSize: 11),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -886,17 +1050,37 @@ class _InsightsSectionState extends ConsumerState<_InsightsSection> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Insights',
+                  'Alertas e indicadores',
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
                       ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                if (active.length > _initialMax)
-                  TextButton(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    child: Text(_expanded ? 'Ver menos' : 'Ver más (${active.length - _initialMax})'),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (active.isNotEmpty)
+                      TextButton(
+                        onPressed: () async {
+                          await repo.dismissAllInsights();
+                          ref.invalidate(insightsProvider);
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          foregroundColor: Colors.grey,
+                        ),
+                        child: const Text('Descartar todo', style: TextStyle(fontSize: 12)),
+                      ),
+                    if (active.length > _initialMax)
+                      TextButton(
+                        onPressed: () => setState(() => _expanded = !_expanded),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Text(_expanded ? 'Ver menos' : 'Ver más (${active.length - _initialMax})'),
+                      ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -1013,20 +1197,27 @@ IconData _insightIcon(String type) {
 
 // �"?�"? Top categories �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
 Widget _categoryIconWidget(String icon) {
-  final isEmoji = icon.runes.any((r) => r > 127) || icon.length <= 2;
-  if (isEmoji) return Text(icon, style: const TextStyle(fontSize: 22));
-  return Icon(materialIconFromString(icon), size: 22);
+  final iconData = materialIconFromString(icon);
+  return Container(
+    width: 30,
+    height: 30,
+    decoration: BoxDecoration(
+      color: AppColors.warning.withAlpha(28),
+      shape: BoxShape.circle,
+    ),
+    child: Icon(iconData, size: 17, color: AppColors.warning),
+  );
 }
 
-class _TopCategories extends StatelessWidget {
+class _TopCategories extends ConsumerWidget {
   const _TopCategories({required this.categories});
   final List<CategorySpend> categories;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (categories.isEmpty) return const SizedBox.shrink();
     final total = categories.fold(0.0, (s, c) => s + c.amount);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1085,14 +1276,14 @@ class _TopCategories extends StatelessWidget {
 }
 
 // �"?�"? Recent expenses �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
-class _RecentExpenses extends StatelessWidget {
+class _RecentExpenses extends ConsumerWidget {
   const _RecentExpenses({required this.expenses});
   final List<RecentExpense> expenses;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (expenses.isEmpty) return const SizedBox.shrink();
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

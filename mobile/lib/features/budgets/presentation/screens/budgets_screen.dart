@@ -6,6 +6,8 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../expenses/providers/expenses_provider.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 
 class BudgetModel {
   const BudgetModel({
@@ -78,10 +80,15 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
   @override
   Widget build(BuildContext context) {
     final budgetsAsync = ref.watch(budgetsProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Presupuestos')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _busy ? null : () => _showAddBudgetSheet(context),
         icon: const Icon(Icons.add),
@@ -89,7 +96,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
       ),
       body: budgetsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(budgetsProvider)),
         data: (budgets) => budgets.isEmpty
             ? const Center(
                 child: Text(
@@ -101,9 +108,77 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                 onRefresh: () => ref.refresh(budgetsProvider.future),
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  itemCount: budgets.length,
+                  itemCount: budgets.length + 1,
                   itemBuilder: (_, i) {
-                    final b = budgets[i];
+                    if (i == 0) {
+                      final totalLimit = budgets.fold<double>(0, (s, b) => s + b.amount);
+                      final totalSpent = budgets.fold<double>(0, (s, b) => s + b.spent);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Presupuestos',
+                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$monthTitle · ${budgets.length} ${budgets.length == 1 ? 'presupuesto' : 'presupuestos'}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Theme.of(context).shadowColor.withAlpha(14),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 7),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Control de presupuestos',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${fmt.format(totalSpent)} / ${fmt.format(totalLimit)}',
+                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${budgets.length} presupuestos activos',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final b = budgets[i - 1];
                     final pctLabel = '${(b.usedPct * 100).toStringAsFixed(0)}%';
                     final barColor = b.isOverBudget
                         ? AppColors.riskRed
@@ -111,59 +186,88 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                             ? AppColors.riskYellow
                             : AppColors.riskGreen;
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: _busy ? null : () => _showEditBudgetSheet(context, b),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(materialIconFromString(b.categoryIcon), size: 24),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(b.name,
-                                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  ),
-                                  Text(
-                                    pctLabel,
-                                    style: TextStyle(
-                                        color: barColor, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(Icons.edit_outlined, size: 16, color: Colors.grey.shade500),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: b.usedPct,
-                                  minHeight: 8,
-                                  color: barColor,
-                                  backgroundColor:
-                                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).shadowColor.withAlpha(14),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: _AnimatedCardEntry(
+                          index: i,
+                          child: Material(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(22),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: _busy ? null : () => _showBudgetActionsSheet(context, b),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 48,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            color: barColor.withAlpha(20),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Icon(materialIconFromString(b.categoryIcon), size: 22, color: barColor),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            b.name,
+                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                          ),
+                                        ),
+                                        Text(
+                                          pctLabel,
+                                          style: TextStyle(color: barColor, fontWeight: FontWeight.w800),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.chevron_right, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: b.usedPct,
+                                        minHeight: 10,
+                                        color: barColor,
+                                        backgroundColor:
+                                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Gastado: ${fmt.format(b.spent)}',
+                                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                        ),
+                                        Text(
+                                          'Límite: ${fmt.format(b.amount)}',
+                                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Gastado: ${fmt.format(b.spent)}',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  Text(
-                                    'Límite: ${fmt.format(b.amount)}',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -198,6 +302,73 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
       ),
     );
     if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _showBudgetActionsSheet(BuildContext context, BudgetModel budget) async {
+    if (_busy) return;
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar presupuesto'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditBudgetSheet(context, budget);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar presupuesto', style: TextStyle(color: AppColors.expense)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteBudget(context, budget);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteBudget(BuildContext context, BudgetModel budget) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar presupuesto'),
+        content: Text('¿Deseas eliminar "${budget.name}"? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete('${ApiConstants.budgets}/${budget.id}');
+      ref.invalidate(budgetsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Presupuesto eliminado')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 }
 
@@ -340,7 +511,7 @@ class _AddBudgetSheetState extends ConsumerState<_AddBudgetSheet> {
                 loading: () => const LinearProgressIndicator(),
                 error: (e, _) => const SizedBox.shrink(),
                 data: (cats) => DropdownButtonFormField<String>(
-                  value: _categoryId,
+                  initialValue: _categoryId,
                   decoration: const InputDecoration(labelText: 'Categoría'),
                   isExpanded: true,
                   items: cats.map((c) => DropdownMenuItem(
@@ -358,7 +529,7 @@ class _AddBudgetSheetState extends ConsumerState<_AddBudgetSheet> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _periodType,
+                initialValue: _periodType,
                 decoration: const InputDecoration(labelText: 'Período'),
                 items: List.generate(_periods.length,
                     (i) => DropdownMenuItem(value: _periods[i], child: Text(_periodLabels[i]))),
@@ -574,7 +745,7 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
                 data: (cats) {
                   final validId = cats.any((c) => c.id == _categoryId) ? _categoryId : null;
                   return DropdownButtonFormField<String>(
-                    value: validId,
+                    initialValue: validId,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     isExpanded: true,
                     items: cats.map((c) => DropdownMenuItem(
@@ -593,7 +764,7 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _periodType,
+                initialValue: _periodType,
                 decoration: const InputDecoration(labelText: 'Período'),
                 items: List.generate(_periods.length,
                     (i) => DropdownMenuItem(value: _periods[i], child: Text(_periodLabels[i]))),
@@ -618,6 +789,33 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AnimatedCardEntry extends StatelessWidget {
+  const _AnimatedCardEntry({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = (index * 0.04).clamp(0.0, 0.55);
+    final end = (start + 0.32).clamp(0.0, 1.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+      builder: (context, value, child) {
+        final y = (1 - value) * 10;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, y), child: child),
+        );
+      },
+      child: child,
     );
   }
 }

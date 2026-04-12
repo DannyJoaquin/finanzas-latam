@@ -2,14 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreditCard } from './credit-card.entity';
+import { CreditCardPayment } from './credit-card-payment.entity';
 import { Expense } from '../expenses/expense.entity';
-import { CreateCreditCardDto, UpdateCreditCardDto } from './dto/credit-card.dto';
+import { CreateCreditCardDto, UpdateCreditCardDto, RecordCardPaymentDto } from './dto/credit-card.dto';
 
 @Injectable()
 export class CreditCardsService {
   constructor(
     @InjectRepository(CreditCard)
     private cardRepo: Repository<CreditCard>,
+    @InjectRepository(CreditCardPayment)
+    private paymentRepo: Repository<CreditCardPayment>,
     @InjectRepository(Expense)
     private expenseRepo: Repository<Expense>,
   ) {}
@@ -54,6 +57,28 @@ export class CreditCardsService {
     return Promise.all(cards.map((card) => this.buildCardSummary(card, userId, today)));
   }
 
+  async recordPayment(userId: string, cardId: string, dto: RecordCardPaymentDto): Promise<CreditCardPayment> {
+    await this.findOne(userId, cardId);
+    const payment = this.paymentRepo.create({
+      cardId,
+      userId,
+      amount: dto.amount,
+      cycleStart: dto.cycleStart,
+      cycleEnd: dto.cycleEnd,
+      paymentDate: dto.paymentDate,
+      notes: dto.notes ?? null,
+    });
+    return this.paymentRepo.save(payment);
+  }
+
+  async getPaymentsForCard(userId: string, cardId: string): Promise<CreditCardPayment[]> {
+    await this.findOne(userId, cardId);
+    return this.paymentRepo.find({
+      where: { cardId, userId },
+      order: { paymentDate: 'DESC' },
+    });
+  }
+
   // ── private helpers ───────────────────────────────────────────────────────
 
   private async buildCardSummary(card: CreditCard, userId: string, today: Date) {
@@ -63,29 +88,83 @@ export class CreditCardsService {
     const todayStr = this.toDateStr(today);
     const cycleEndStr = this.toDateStr(cycle.currentEnd);
 
-    const currentBalance = await this.getCardBalance(card.id, userId, openStart, todayStr);
+    const currentSplit = await this.getCardBalanceSplit(card.id, userId, openStart, todayStr);
+    const currentBalance = currentSplit.hnl + currentSplit.usd;
 
     const paymentDueDate = new Date(cycle.currentEnd);
     paymentDueDate.setDate(paymentDueDate.getDate() + card.paymentDueDays);
 
     let overdueBalance = 0;
+    let overdueBalanceHNL = 0;
+    let overdueBalanceUSD = 0;
     let closedCyclePaymentDue: string | null = null;
     let daysUntilClosedPayment: number | null = null;
+    let closedCycleStart: string | null = null;
+    let closedCycleEnd: string | null = null;
+    let closedCyclePaidAmount: number | null = null;
+    let closedCyclePaidDate: string | null = null;
 
     if (cycle.previousCycle) {
       const prevStart = this.toDateStr(cycle.previousCycle.start);
       const prevEnd = this.toDateStr(cycle.previousCycle.end);
-      overdueBalance = await this.getCardBalance(card.id, userId, prevStart, prevEnd);
+      const overdueSplit = await this.getCardBalanceSplit(card.id, userId, prevStart, prevEnd);
+      overdueBalance = overdueSplit.hnl + overdueSplit.usd;
+      overdueBalanceHNL = overdueSplit.hnl;
+      overdueBalanceUSD = overdueSplit.usd;
       const closedPayDate = new Date(cycle.previousCycle.end);
       closedPayDate.setDate(closedPayDate.getDate() + card.paymentDueDays);
       closedCyclePaymentDue = this.toDateStr(closedPayDate);
       daysUntilClosedPayment = this.daysBetween(today, closedPayDate);
+      closedCycleStart = prevStart;
+      closedCycleEnd = prevEnd;
+
+      // Sum all payments recorded for this closed cycle
+      const cyclePayments = await this.paymentRepo.find({
+        where: { cardId: card.id, userId, cycleStart: prevStart, cycleEnd: prevEnd },
+        order: { createdAt: 'DESC' },
+      });
+      if (cyclePayments.length > 0) {
+        closedCyclePaidAmount = cyclePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        closedCyclePaidDate = cyclePayments[0].paymentDate;
+      }
+    }
+
+    // Most recent payment for this card (any cycle)
+    const lastPaymentRecord = await this.paymentRepo.findOne({
+      where: { cardId: card.id, userId },
+      order: { createdAt: 'DESC' },
+    });
+    const lastPaymentAmount = lastPaymentRecord ? Number(lastPaymentRecord.amount) : null;
+    const lastPaymentDate = lastPaymentRecord?.paymentDate ?? null;
+
+    // Payment status — ONLY reflects the closed cycle debt, never the open active cycle.
+    // Current cycle spending is not "due" until the cycle closes.
+    let paymentStatus: 'paid' | 'partial' | 'unpaid' | 'no_debt';
+    let paymentCoverage: number | null = null;
+
+    if (overdueBalance > 0) {
+      // Previous cycle has unpaid balance — evaluate how much was covered
+      if (closedCyclePaidAmount === null) {
+        paymentStatus = 'unpaid';
+      } else {
+        const coverage = Math.min(100, Math.round((closedCyclePaidAmount / overdueBalance) * 100));
+        paymentCoverage = coverage;
+        paymentStatus = coverage >= 100 ? 'paid' : 'partial';
+      }
+    } else {
+      // No closed-cycle debt — current cycle is active and nothing is due yet
+      paymentStatus = 'no_debt';
     }
 
     const creditLimit = card.creditLimit ? Number(card.creditLimit) : null;
+    // Net unpaid HNL balance — used for utilization % (limit is in HNL)
+    const unpaidOverdueHNL = closedCyclePaidAmount !== null
+      ? Math.max(0, overdueBalanceHNL - closedCyclePaidAmount)
+      : overdueBalanceHNL;
+    const totalUsedHNL = currentSplit.hnl + unpaidOverdueHNL;
     const utilizationPct =
       creditLimit && creditLimit > 0
-        ? Math.round((currentBalance / creditLimit) * 100)
+        ? Math.min(100, Math.round((totalUsedHNL / creditLimit) * 100))
         : null;
 
     return {
@@ -104,9 +183,21 @@ export class CreditCardsService {
       daysUntilCutOff: cycle.daysUntilCutOff,
       daysUntilPayment: this.daysBetween(today, paymentDueDate),
       currentBalance,
+      currentBalanceHNL: currentSplit.hnl,
+      currentBalanceUSD: currentSplit.usd,
       overdueBalance,
+      overdueBalanceHNL,
+      overdueBalanceUSD,
       closedCyclePaymentDue,
       daysUntilClosedPayment,
+      closedCycleStart,
+      closedCycleEnd,
+      closedCyclePaidAmount,
+      closedCyclePaidDate,
+      lastPaymentAmount,
+      lastPaymentDate,
+      paymentStatus,
+      paymentCoverage,
       utilizationPct,
     };
   }
@@ -147,21 +238,27 @@ export class CreditCardsService {
     };
   }
 
-  private async getCardBalance(
+  private async getCardBalanceSplit(
     cardId: string,
     userId: string,
     start: string,
     end: string,
-  ): Promise<number> {
-    const result = await this.expenseRepo
+  ): Promise<{ hnl: number; usd: number }> {
+    const rows = await this.expenseRepo
       .createQueryBuilder('e')
-      .select('COALESCE(SUM(e.amount), 0)', 'total')
+      .select('e.currency', 'currency')
+      .addSelect('COALESCE(SUM(e.amount), 0)', 'total')
       .where(
         'e.creditCardId = :cardId AND e.userId = :userId AND e.date BETWEEN :start AND :end',
         { cardId, userId, start, end },
       )
-      .getRawOne<{ total: string }>();
-    return parseFloat(result?.total ?? '0');
+      .groupBy('e.currency')
+      .getRawMany<{ currency: string; total: string }>();
+
+    return {
+      hnl: parseFloat(rows.find((r) => r.currency === 'HNL')?.total ?? '0'),
+      usd: parseFloat(rows.find((r) => r.currency === 'USD')?.total ?? '0'),
+    };
   }
 
   private toDateStr(d: Date): string {

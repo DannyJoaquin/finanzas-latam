@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/dio_client.dart';
+import '../../../core/services/fcm_service.dart';
 import '../models/auth_models.dart';
 import '../repositories/auth_repository.dart';
 
@@ -9,6 +13,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   Future<AuthState> build() async {
     final repo = ref.read(authRepositoryProvider);
     final restored = await repo.tryRestoreSession();
+    if (restored != null && restored.isAuthenticated) {
+      unawaited(_tryRegisterFcmToken(restored));
+    }
     return restored ?? const AuthState.unauthenticated();
   }
 
@@ -17,6 +24,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     state = await AsyncValue.guard(
       () => ref.read(authRepositoryProvider).login(email: email, password: password),
     );
+    unawaited(_tryRegisterFcmToken());
   }
 
   Future<void> register({
@@ -32,6 +40,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
           ),
     );
+    unawaited(_tryRegisterFcmToken());
   }
 
   Future<void> logout() async {
@@ -50,7 +59,25 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       },
     );
     state = result;
+    unawaited(_tryRegisterFcmToken());
+  }
+
+  Future<void> _tryRegisterFcmToken([AuthState? auth]) async {
+    final currentAuth = auth ?? state.valueOrNull;
+    if (currentAuth == null || !currentAuth.isAuthenticated) return;
+    try {
+      final dio = ref.read(dioProvider);
+      await FcmService.instance.registerToken(dio);
+    } catch (_) {
+      // Non-fatal: login must not fail when push is unavailable.
+    }
   }
 }
 
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+
+/// The user's configured local currency (e.g. 'HNL', 'USD', 'GTQ').
+/// Falls back to 'HNL' when not authenticated yet.
+final currencyProvider = Provider<String>((ref) {
+  return ref.watch(authStateProvider).valueOrNull?.user?.currency ?? 'HNL';
+});

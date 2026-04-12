@@ -62,6 +62,7 @@ class ExpenseModel {
   const ExpenseModel({
     required this.id,
     required this.amount,
+    required this.currency,
     required this.description,
     required this.date,
     required this.categoryId,
@@ -72,6 +73,7 @@ class ExpenseModel {
 
   final String id;
   final double amount;
+  final String currency;
   final String description;
   final String date;
   final String? categoryId;
@@ -84,6 +86,7 @@ class ExpenseModel {
     return ExpenseModel(
       id: j['id'] as String,
       amount: double.parse((j['amount'] ?? 0).toString()),
+      currency: j['currency'] as String? ?? 'HNL',
       description: j['description'] as String? ?? '',
       date: (j['date'] as String).substring(0, 10),
       categoryId: cat?['id'] as String?,

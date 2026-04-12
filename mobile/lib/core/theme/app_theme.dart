@@ -65,6 +65,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       fontFamily: _fontFamily,
+      scaffoldBackgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
       appBarTheme: AppBarTheme(
         backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
         foregroundColor: isDark ? AppColors.onSurfaceDark : AppColors.onSurface,
@@ -75,13 +76,13 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: isDark ? AppColors.outlineDark : AppColors.outline,
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide.none,
         ),
-        color: isDark ? AppColors.surfaceVariantDark : AppColors.surface,
+        color: isDark ? AppColors.surfaceVariantDark : colorScheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withAlpha(isDark ? 50 : 24),
+        margin: EdgeInsets.zero,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -109,21 +110,31 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: AppColors.primary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          side: BorderSide(color: AppColors.primary.withAlpha(140)),
         ),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        iconColor: isDark ? AppColors.onSurfaceVariantDark : AppColors.onSurfaceVariant,
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         type: BottomNavigationBarType.fixed,
-        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+        backgroundColor: isDark ? AppColors.surfaceVariantDark : AppColors.surface,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: isDark ? AppColors.onSurfaceVariantDark : AppColors.onSurfaceVariant,
         elevation: 0,
@@ -132,7 +143,7 @@ class AppTheme {
         unselectedLabelStyle: const TextStyle(fontSize: 12),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+        backgroundColor: isDark ? AppColors.surfaceVariantDark : AppColors.surface,
         indicatorColor: isDark
             ? AppColors.primaryContainerDark
             : AppColors.primaryLight,

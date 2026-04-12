@@ -4,12 +4,18 @@ import { Between, ILike, MoreThan, Repository } from 'typeorm';
 import { Expense, PaymentMethod } from './expense.entity';
 import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/expense.dto';
 import { parsePagination, buildMeta } from '../../common/utils/pagination.util';
+import { CashAccount } from '../cash/cash-account.entity';
+import { CashTransaction, CashTxType } from '../cash/cash-transaction.entity';
 
 @Injectable()
 export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private expenseRepo: Repository<Expense>,
+    @InjectRepository(CashAccount)
+    private cashAccountRepo: Repository<CashAccount>,
+    @InjectRepository(CashTransaction)
+    private cashTxRepo: Repository<CashTransaction>,
   ) {}
 
   async findAll(userId: string, filters: FilterExpensesDto) {
@@ -28,6 +34,7 @@ export class ExpensesService {
     if (filters.endDate) qb.andWhere('e.date <= :end', { end: filters.endDate });
     if (filters.categoryId) qb.andWhere('e.categoryId = :catId', { catId: filters.categoryId });
     if (filters.paymentMethod) qb.andWhere('e.paymentMethod = :method', { method: filters.paymentMethod });
+    if (filters.creditCardId) qb.andWhere('e.creditCardId = :creditCardId', { creditCardId: filters.creditCardId });
     if (filters.search) {
       qb.andWhere('e.description ILIKE :search', { search: `%${filters.search}%` });
     }
@@ -65,14 +72,47 @@ export class ExpensesService {
     });
     if (duplicate) throw new ConflictException('Duplicate expense detected: identical expense submitted within 5 seconds');
     const expense = this.expenseRepo.create({ ...dto, userId, date: expenseDate });
+    let saved: Expense;
     try {
-      return await this.expenseRepo.save(expense);
+      saved = await this.expenseRepo.save(expense);
     } catch (err: any) {
       if (err?.code === '23503') {
         throw new BadRequestException('Invalid categoryId: category does not exist');
       }
       throw err;
     }
+
+    // Auto-deduct from cash account when payment method is cash
+    if (saved.paymentMethod === PaymentMethod.CASH) {
+      try {
+        const accountId = dto.cashAccountId ?? undefined;
+        const account = accountId
+          ? await this.cashAccountRepo.findOne({ where: { id: accountId, userId } })
+          : await this.cashAccountRepo.findOne({
+              where: { userId, isDefault: true },
+            }) ??
+            (await this.cashAccountRepo.find({ where: { userId }, order: { createdAt: 'ASC' }, take: 1 }))[0];
+
+        if (account) {
+          account.balance = Number(account.balance) - Number(saved.amount);
+          await this.cashAccountRepo.save(account);
+          const tx = this.cashTxRepo.create({
+            cashAccountId: account.id,
+            userId,
+            type: CashTxType.SPEND,
+            amount: saved.amount,
+            description: saved.description || 'Gasto en efectivo',
+            date: expenseDate,
+            expenseId: saved.id,
+          });
+          await this.cashTxRepo.save(tx);
+        }
+      } catch {
+        // Cash deduction is best-effort; don't fail the expense creation
+      }
+    }
+
+    return saved;
   }
 
   async update(userId: string, id: string, dto: UpdateExpenseDto): Promise<Expense> {
@@ -84,6 +124,28 @@ export class ExpensesService {
 
   async remove(userId: string, id: string): Promise<void> {
     const expense = await this.findOne(userId, id);
+
+    // Reverse cash deduction if this expense had one
+    if (expense.paymentMethod === PaymentMethod.CASH) {
+      try {
+        const tx = await this.cashTxRepo.findOne({
+          where: { expenseId: expense.id, userId },
+        });
+        if (tx) {
+          const account = await this.cashAccountRepo.findOne({
+            where: { id: tx.cashAccountId, userId },
+          });
+          if (account) {
+            account.balance = Number(account.balance) + Number(expense.amount);
+            await this.cashAccountRepo.save(account);
+          }
+          await this.cashTxRepo.remove(tx);
+        }
+      } catch {
+        // Reversal is best-effort
+      }
+    }
+
     await this.expenseRepo.remove(expense);
   }
 

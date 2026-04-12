@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ExpensesService } from './expenses.service';
 import { Expense } from './expense.entity';
+import { CashAccount } from '../cash/cash-account.entity';
+import { CashTransaction } from '../cash/cash-transaction.entity';
 
 // Mock the queryBuilder chain
 const createQbMock = (items: any[] = [], total = 0) => ({
@@ -24,6 +26,19 @@ const createQbMock = (items: any[] = [], total = 0) => ({
 
 const mockExpenseRepo = () => ({
   createQueryBuilder: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  remove: jest.fn(),
+});
+
+const mockCashAccountRepo = () => ({
+  findOne: jest.fn(),
+  find: jest.fn(),
+  save: jest.fn(),
+});
+
+const mockCashTxRepo = () => ({
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
@@ -52,6 +67,8 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: getRepositoryToken(Expense), useFactory: mockExpenseRepo },
+        { provide: getRepositoryToken(CashAccount), useFactory: mockCashAccountRepo },
+        { provide: getRepositoryToken(CashTransaction), useFactory: mockCashTxRepo },
       ],
     }).compile();
 

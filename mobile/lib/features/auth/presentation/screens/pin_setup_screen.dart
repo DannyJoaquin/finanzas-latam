@@ -58,69 +58,90 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !_confirming,
-        title: Text(_confirming ? 'Confirmar PIN' : 'Crear PIN'),
+        title: const SizedBox.shrink(),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _confirming ? 'Confirma tu PIN de 6 dígitos' : 'Elige un PIN de 6 dígitos',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).shadowColor.withAlpha(14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            const SizedBox(height: 40),
-            // PIN dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                6,
-                (i) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i < _pin.length
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.outline,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _confirming ? 'Confirmar PIN' : 'Crear PIN',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _confirming ? 'Confirma tu PIN de 6 dígitos' : 'Elige un PIN de 6 dígitos',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 26),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    6,
+                    (i) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i < _pin.length
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 48),
-            // Number pad
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 1.4,
-              ),
-              itemCount: 12,
-              itemBuilder: (_, i) {
-                if (i == 9) return const SizedBox.shrink();
-                if (i == 11) {
-                  return IconButton(
-                    icon: const Icon(Icons.backspace_outlined, size: 28),
-                    onPressed: _onDelete,
-                  );
-                }
-                final digit = i == 10 ? '0' : '${i + 1}';
-                return TextButton(
-                  onPressed: () => _onKey(digit),
-                  child: Text(
-                    digit,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w500),
+                const SizedBox(height: 28),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.4,
                   ),
-                );
-              },
+                  itemCount: 12,
+                  itemBuilder: (_, i) {
+                    if (i == 9) return const SizedBox.shrink();
+                    if (i == 11) {
+                      return IconButton(
+                        icon: const Icon(Icons.backspace_outlined, size: 28),
+                        onPressed: _onDelete,
+                      );
+                    }
+                    final digit = i == 10 ? '0' : '${i + 1}';
+                    return TextButton(
+                      onPressed: () => _onKey(digit),
+                      child: Text(
+                        digit,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

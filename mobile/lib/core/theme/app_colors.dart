@@ -36,11 +36,11 @@ class AppColors {
   static const Color onSurfaceVariant = Color(0xFF5F6368);
 
   // Neutral shades (dark)
-  static const Color surfaceDark = Color(0xFF1A1C1E);
-  static const Color surfaceVariantDark = Color(0xFF252729);
-  static const Color outlineDark = Color(0xFF3C3F43);
+  static const Color surfaceDark = Color(0xFF121417);
+  static const Color surfaceVariantDark = Color(0xFF1A1E24);
+  static const Color outlineDark = Color(0xFF2E343D);
   static const Color onSurfaceDark = Color(0xFFE2E2E6);
-  static const Color onSurfaceVariantDark = Color(0xFF8E9099);
+  static const Color onSurfaceVariantDark = Color(0xFFB1B8C3);
 
   // Dark-mode containers (deep, low-saturation tints)
   static const Color primaryContainerDark = Color(0xFF0C2D6B);

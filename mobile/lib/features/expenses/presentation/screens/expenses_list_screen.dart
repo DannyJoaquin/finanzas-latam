@@ -7,21 +7,53 @@ import '../../providers/expenses_provider.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/constants/currency_format.dart';
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
 class _ExpenseFilter {
-  const _ExpenseFilter({this.startDate, this.endDate, this.paymentMethod});
+  const _ExpenseFilter({
+    this.startDate,
+    this.endDate,
+    this.paymentMethod,
+    this.selectedMonth,
+    this.selectedCategoryId,
+  });
   final DateTime? startDate;
   final DateTime? endDate;
   final String? paymentMethod;
-  bool get isActive => startDate != null || endDate != null || paymentMethod != null;
-  _ExpenseFilter copyWith({DateTime? startDate, DateTime? endDate, String? paymentMethod, bool clearStart = false, bool clearEnd = false, bool clearMethod = false}) {
+  /// When set, filters the entire calendar month (overrides start/end).
+  final DateTime? selectedMonth;
+  final String? selectedCategoryId;
+
+  bool get isActive =>
+      startDate != null ||
+      endDate != null ||
+      paymentMethod != null ||
+      selectedMonth != null ||
+      selectedCategoryId != null;
+
+  _ExpenseFilter copyWith({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? paymentMethod,
+    DateTime? selectedMonth,
+    String? selectedCategoryId,
+    bool clearStart = false,
+    bool clearEnd = false,
+    bool clearMethod = false,
+    bool clearMonth = false,
+    bool clearCategory = false,
+  }) {
     return _ExpenseFilter(
       startDate: clearStart ? null : (startDate ?? this.startDate),
       endDate: clearEnd ? null : (endDate ?? this.endDate),
       paymentMethod: clearMethod ? null : (paymentMethod ?? this.paymentMethod),
+      selectedMonth: clearMonth ? null : (selectedMonth ?? this.selectedMonth),
+      selectedCategoryId:
+          clearCategory ? null : (selectedCategoryId ?? this.selectedCategoryId),
     );
   }
 }
@@ -41,29 +73,54 @@ class ExpensesListScreen extends ConsumerStatefulWidget {
 class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
   bool _busy = false;
 
+  String _formatMixedTotal(_CurrencyTotals totals) {
+    if (totals.hnl > 0 && totals.usd > 0) {
+      return '${currencyFmt('HNL').format(totals.hnl)} + ${currencyFmt('USD').format(totals.usd)}';
+    }
+    if (totals.usd > 0) {
+      return currencyFmt('USD').format(totals.usd);
+    }
+    return currencyFmt('HNL').format(totals.hnl);
+  }
+
   @override
   Widget build(BuildContext context) {
     final expAsync = ref.watch(expensesProvider);
     final filter = ref.watch(_expensesFilterProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gastos'),
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
         actions: [
           Stack(
             clipBehavior: Clip.none,
             children: [
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                onPressed: _busy ? null : () => _showFilterSheet(context),
-                tooltip: 'Filtrar',
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).shadowColor.withAlpha(14),
+                      blurRadius: 20,
+                      offset: const Offset(0, 7),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  iconSize: 20,
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _busy ? null : () => _showFilterSheet(context),
+                  tooltip: 'Filtrar',
+                ),
               ),
               if (filter.isActive)
                 Positioned(
                   top: 8,
-                  right: 8,
+                  right: 14,
                   child: Container(
                     width: 8,
                     height: 8,
@@ -79,28 +136,82 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
       ),
       body: expAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(expensesProvider)),
         data: (expenses) {
           // Apply filter
           var filtered = expenses;
-          if (filter.startDate != null) {
-            filtered = filtered
-                .where((e) =>
-                    !DateTime.parse(e.date)
-                        .isBefore(filter.startDate!))
-                .toList();
-          }
-          if (filter.endDate != null) {
-            filtered = filtered
-                .where((e) =>
-                    !DateTime.parse(e.date)
-                        .isAfter(filter.endDate!.add(const Duration(days: 1))))
-                .toList();
+          if (filter.selectedMonth != null) {
+            final m = filter.selectedMonth!;
+            filtered = filtered.where((e) {
+              final d = DateTime.parse(e.date);
+              return d.year == m.year && d.month == m.month;
+            }).toList();
+          } else {
+            if (filter.startDate != null) {
+              filtered = filtered
+                  .where((e) => !DateTime.parse(e.date).isBefore(filter.startDate!))
+                  .toList();
+            }
+            if (filter.endDate != null) {
+              filtered = filtered
+                  .where((e) => !DateTime.parse(e.date)
+                      .isAfter(filter.endDate!.add(const Duration(days: 1))))
+                  .toList();
+            }
           }
           if (filter.paymentMethod != null) {
+            filtered = filtered.where((e) => e.paymentMethod == filter.paymentMethod).toList();
+          }
+
+          final categorySource = [...filtered];
+          if (filter.selectedCategoryId != null) {
             filtered = filtered
-                .where((e) => e.paymentMethod == filter.paymentMethod)
+                .where((e) => e.categoryId == filter.selectedCategoryId)
                 .toList();
+          }
+
+          // Sort descending
+          final sorted = [...filtered]..sort((a, b) => b.date.compareTo(a.date));
+          final totalFiltered = _CurrencyTotals.fromExpenses(sorted);
+          final now = DateTime.now();
+          final monthLabel = DateFormat('MMMM yyyy', 'es').format(now);
+          final monthTitle = monthLabel[0].toUpperCase() + monthLabel.substring(1);
+
+          final byCategory = <String, _CategoryChipData>{};
+          for (final e in categorySource) {
+            final id = e.categoryId ?? e.categoryName;
+            final prev = byCategory[id];
+            byCategory[id] = _CategoryChipData(
+              id: id,
+              name: e.categoryName,
+              total: (prev?.total ?? 0) + e.amount,
+            );
+          }
+          final categoryChips = byCategory.values.toList()
+            ..sort((a, b) => b.total.compareTo(a.total));
+
+          // Build interleaved list: String = month header, ExpenseModel = row
+          final monthFmt = DateFormat('MMMM yyyy', 'es');
+          final List<dynamic> listItems = [];
+          // Pre-compute per-month subtotals
+          final Map<String, _CurrencyTotals> monthTotals = {};
+          for (final e in sorted) {
+            final key = DateFormat('yyyy-MM').format(DateTime.parse(e.date));
+            monthTotals[key] = (monthTotals[key] ?? const _CurrencyTotals()).addExpense(e);
+          }
+          String? lastMonthKey;
+          for (final e in sorted) {
+            final d = DateTime.parse(e.date);
+            final key = DateFormat('yyyy-MM').format(d);
+            if (key != lastMonthKey) {
+              final raw = monthFmt.format(d);
+              listItems.add(_MonthHeader(
+                label: raw[0].toUpperCase() + raw.substring(1),
+                totals: monthTotals[key] ?? const _CurrencyTotals(),
+              ));
+              lastMonthKey = key;
+            }
+            listItems.add(e);
           }
           if (filtered.isEmpty) {
             return Center(
@@ -126,44 +237,259 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(expensesProvider.future),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: filtered.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (_, i) {
-                final e = filtered[i];
-                final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.expense.withAlpha(20),
-                    child: isEmoji
-                        ? Text(e.categoryIcon)
-                        : Icon(
-                            materialIconFromString(e.categoryIcon),
-                            size: 20,
-                            color: AppColors.expense,
+            child: CustomScrollView(
+              slivers: [
+                // Hero header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Gastos',
+                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$monthTitle · ${sorted.length} ${sorted.length == 1 ? 'movimiento' : 'movimientos'}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).shadowColor.withAlpha(14),
+                                blurRadius: 20,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
                           ),
-                  ),
-                  title: Text(
-                    e.description.isEmpty ? e.categoryName : e.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${e.categoryName} · ${DateFormat('dd MMM', 'en_US').format(DateTime.parse(e.date))}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: Text(
-                    '-${fmt.format(e.amount)}',
-                    style: const TextStyle(
-                      color: AppColors.expense,
-                      fontWeight: FontWeight.w600,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total gastado',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _formatMixedTotal(totalFiltered),
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.expense,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: const Text('Todos'),
+                                  showCheckmark: false,
+                                  side: BorderSide.none,
+                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                  selectedColor: colorScheme.primary.withAlpha(24),
+                                  labelStyle: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: filter.selectedCategoryId == null
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  selected: filter.selectedCategoryId == null,
+                                  onSelected: (_) {
+                                    ref.read(_expensesFilterProvider.notifier).state =
+                                        filter.copyWith(clearCategory: true);
+                                  },
+                                ),
+                              ),
+                              ...categoryChips.take(6).map((cat) {
+                                final selected = filter.selectedCategoryId == cat.id;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(cat.name),
+                                    showCheckmark: false,
+                                    side: BorderSide.none,
+                                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                    selectedColor: colorScheme.primary.withAlpha(24),
+                                    labelStyle: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: selected
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    selected: selected,
+                                    onSelected: (_) {
+                                      ref.read(_expensesFilterProvider.notifier).state =
+                                          filter.copyWith(selectedCategoryId: cat.id);
+                                    },
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  onTap: _busy ? null : () => _showEditSheet(context, e),
-                );
-              },
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) {
+                      final item = listItems[i];
+
+                      // ── Month header ──────────────────────────────
+                      if (item is _MonthHeader) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                item.label,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Divider(
+                                  thickness: 1,
+                                  color: Theme.of(context).colorScheme.primary.withAlpha(50),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                _formatMixedTotal(item.totals),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.expense.withAlpha(180),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // ── Expense row ───────────────────────────────
+                      final e = item as ExpenseModel;
+                      final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).shadowColor.withAlpha(14),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: _AnimatedItemEntry(
+                            index: i,
+                            child: Material(
+                              color: Theme.of(context).colorScheme.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(22),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(22),
+                                onTap: _busy ? null : () => _showExpenseActionsSheet(context, e),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.expense.withAlpha(20),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: isEmoji
+                                            ? Text(e.categoryIcon, style: const TextStyle(fontSize: 24))
+                                            : Icon(
+                                                materialIconFromString(e.categoryIcon),
+                                                size: 24,
+                                                color: AppColors.expense,
+                                              ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              e.description.isEmpty ? e.categoryName : e.description,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '-${currencyFmt(e.currency).format(e.amount)}',
+                                        style: const TextStyle(
+                                          color: AppColors.expense,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: listItems.length,
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 88)),
+              ],
             ),
           );
         },
@@ -192,6 +518,73 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _showExpenseActionsSheet(BuildContext context, ExpenseModel expense) async {
+    if (_busy) return;
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar gasto'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditSheet(context, expense);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar gasto', style: TextStyle(color: AppColors.expense)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteExpense(context, expense);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteExpense(BuildContext context, ExpenseModel expense) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar gasto'),
+        content: const Text('¿Deseas eliminar este gasto? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete('${ApiConstants.expenses}/${expense.id}');
+      ref.invalidate(expensesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gasto eliminado')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   Future<void> _showFilterSheet(BuildContext context) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -199,6 +592,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     DateTime? tmpStart = ref.read(_expensesFilterProvider).startDate;
     DateTime? tmpEnd = ref.read(_expensesFilterProvider).endDate;
     String? tmpMethod = ref.read(_expensesFilterProvider).paymentMethod;
+    DateTime? tmpMonth = ref.read(_expensesFilterProvider).selectedMonth;
+    String? tmpCategoryId = ref.read(_expensesFilterProvider).selectedCategoryId;
 
     const payMethods = <String, String>{
       'cash': 'Efectivo',
@@ -231,6 +626,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                         tmpStart = null;
                         tmpEnd = null;
                         tmpMethod = null;
+                        tmpMonth = null;
+                        tmpCategoryId = null;
                       });
                     },
                     child: const Text('Limpiar'),
@@ -238,6 +635,37 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                 ],
               ),
               const SizedBox(height: 16),
+              // ── Month quick-select ──────────────────────────────────────
+              Text('Mes', style: Theme.of(ctx).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Builder(builder: (_) {
+                final now = DateTime.now();
+                final mFmt = DateFormat('MMM yyyy', 'es');
+                final months = List.generate(6, (i) => DateTime(now.year, now.month - i, 1));
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: months.map((m) {
+                    final selected = tmpMonth != null &&
+                        tmpMonth!.year == m.year &&
+                        tmpMonth!.month == m.month;
+                    final raw = mFmt.format(m);
+                    final label = raw[0].toUpperCase() + raw.substring(1);
+                    return FilterChip(
+                      label: Text(label),
+                      selected: selected,
+                      onSelected: (v) => setState(() {
+                        tmpMonth = v ? m : null;
+                        if (v) { tmpStart = null; tmpEnd = null; }
+                      }),
+                    );
+                  }).toList(),
+                );
+              }),
+              const SizedBox(height: 16),
+              // ── Custom date range ───────────────────────────────────────
+              Text('Rango personalizado', style: Theme.of(ctx).textTheme.labelLarge),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today, size: 18),
                 label: Text(tmpStart != null ? 'Desde: ${dFmt.format(tmpStart!)}' : 'Desde (fecha inicial)'),
@@ -248,7 +676,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime.now(),
                   );
-                  if (picked != null) setState(() => tmpStart = picked);
+                  if (picked != null) setState(() { tmpStart = picked; tmpMonth = null; });
                 },
               ),
               const SizedBox(height: 12),
@@ -262,7 +690,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                     firstDate: tmpStart ?? DateTime(2020),
                     lastDate: DateTime.now(),
                   );
-                  if (picked != null) setState(() => tmpEnd = picked);
+                  if (picked != null) setState(() { tmpEnd = picked; tmpMonth = null; });
                 },
               ),
               const SizedBox(height: 16),
@@ -283,8 +711,13 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () {
-                  ref.read(_expensesFilterProvider.notifier).state =
-                      _ExpenseFilter(startDate: tmpStart, endDate: tmpEnd, paymentMethod: tmpMethod);
+                  ref.read(_expensesFilterProvider.notifier).state = _ExpenseFilter(
+                    startDate: tmpMonth != null ? null : tmpStart,
+                    endDate: tmpMonth != null ? null : tmpEnd,
+                    paymentMethod: tmpMethod,
+                    selectedMonth: tmpMonth,
+                    selectedCategoryId: tmpCategoryId,
+                  );
                   Navigator.pop(ctx);
                 },
                 child: const Text('Aplicar filtros'),
@@ -295,6 +728,76 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
       ),
     );
     if (mounted) setState(() => _busy = false);
+  }
+}
+
+class _CategoryChipData {
+  const _CategoryChipData({
+    required this.id,
+    required this.name,
+    required this.total,
+  });
+
+  final String id;
+  final String name;
+  final double total;
+}
+
+class _AnimatedItemEntry extends StatelessWidget {
+  const _AnimatedItemEntry({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = (index * 0.04).clamp(0.0, 0.55);
+    final end = (start + 0.32).clamp(0.0, 1.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+      builder: (context, value, child) {
+        final y = (1 - value) * 10;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, y), child: child),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+// ── Month header data class ───────────────────────────────────────────────────
+
+class _MonthHeader {
+  const _MonthHeader({required this.label, required this.totals});
+  final String label;
+  final _CurrencyTotals totals;
+}
+
+class _CurrencyTotals {
+  const _CurrencyTotals({this.hnl = 0, this.usd = 0});
+
+  final double hnl;
+  final double usd;
+
+  _CurrencyTotals addExpense(ExpenseModel e) {
+    final currency = e.currency.toUpperCase();
+    if (currency == 'USD') {
+      return _CurrencyTotals(hnl: hnl, usd: usd + e.amount);
+    }
+    return _CurrencyTotals(hnl: hnl + e.amount, usd: usd);
+  }
+
+  static _CurrencyTotals fromExpenses(List<ExpenseModel> expenses) {
+    var totals = const _CurrencyTotals();
+    for (final e in expenses) {
+      totals = totals.addExpense(e);
+    }
+    return totals;
   }
 }
 
@@ -476,7 +979,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                       ? _selectedCategoryId
                       : null;
                   return DropdownButtonFormField<String>(
-                    value: validId,
+                    initialValue: validId,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     isExpanded: true,
                     items: cats.map((c) => DropdownMenuItem(
@@ -499,7 +1002,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _paymentMethod,
+                initialValue: _paymentMethod,
                 decoration: const InputDecoration(labelText: 'Método de pago'),
                 items: _payMethods.entries
                     .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))

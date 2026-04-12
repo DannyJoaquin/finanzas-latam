@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 
 class GoalModel {
   const GoalModel({
@@ -56,10 +58,15 @@ class GoalsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goalsAsync = ref.watch(goalsProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Metas de ahorro')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddGoalSheet(context, ref),
         icon: const Icon(Icons.add),
@@ -67,7 +74,7 @@ class GoalsScreen extends ConsumerWidget {
       ),
       body: goalsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(goalsProvider)),
         data: (goals) => goals.isEmpty
             ? const Center(
                 child: Text(
@@ -79,93 +86,187 @@ class GoalsScreen extends ConsumerWidget {
                 onRefresh: () => ref.refresh(goalsProvider.future),
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  itemCount: goals.length,
+                  itemCount: goals.length + 1,
                   itemBuilder: (_, i) {
-                    final g = goals[i];
+                    if (i == 0) {
+                      final totalTarget = goals.fold<double>(0, (s, g) => s + g.targetAmount);
+                      final totalSaved = goals.fold<double>(0, (s, g) => s + g.currentAmount);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Metas',
+                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$monthTitle · ${goals.length} ${goals.length == 1 ? 'meta' : 'metas'}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Theme.of(context).shadowColor.withAlpha(14),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 7),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ahorro acumulado',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${fmt.format(totalSaved)} / ${fmt.format(totalTarget)}',
+                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${goals.length} metas activas',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final g = goals[i - 1];
                     final pctLabel = '${(g.progress * 100).toStringAsFixed(0)}%';
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(g.icon == '' || g.icon.isEmpty ? '🎯' : g.icon,
-                                    style: const TextStyle(fontSize: 28)),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(g.name,
-                                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      if (g.targetDate != null && g.targetDate!.isNotEmpty)
-                                        Text(
-                                          'Meta: ${g.targetDate}',
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  pctLabel,
-                                  style: const TextStyle(
-                                      color: AppColors.secondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18),
-                                ),
-                                PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert, size: 20),
-                                  onSelected: (value) {
-                                    if (value == 'edit') {
-                                      _showEditGoalSheet(context, ref, g);
-                                    } else if (value == 'delete') {
-                                      _confirmDeleteGoal(context, ref, g);
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('Editar')])),
-                                    PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: AppColors.expense), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: AppColors.expense))])),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(
-                                value: g.progress,
-                                minHeight: 10,
-                                color: AppColors.secondary,
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.surfaceContainerHighest,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Ahorrado: ${fmt.format(g.currentAmount)}',
-                                    style: const TextStyle(fontSize: 12)),
-                                Text('Falta: ${fmt.format(g.remaining)}',
-                                    style: const TextStyle(fontSize: 12)),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: OutlinedButton.icon(
-                                onPressed: () => _showContributeDialog(context, ref, g),
-                                icon: const Icon(Icons.savings_outlined, size: 16),
-                                label: const Text('Abonar'),
-                              ),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).shadowColor.withAlpha(14),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
                             ),
                           ],
+                        ),
+                        child: _AnimatedCardEntry(
+                          index: i,
+                          child: Material(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(22),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: () => _showGoalActionsSheet(context, ref, g),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 50,
+                                          height: 50,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondary.withAlpha(18),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            g.icon == '' || g.icon.isEmpty ? '🎯' : g.icon,
+                                            style: const TextStyle(fontSize: 26),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(g.name,
+                                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                                              if (g.targetDate != null && g.targetDate!.isNotEmpty)
+                                                Text(
+                                                  'Meta: ${g.targetDate}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          pctLabel,
+                                          style: const TextStyle(
+                                            color: AppColors.secondary,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Icon(Icons.chevron_right, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: g.progress,
+                                        minHeight: 10,
+                                        color: AppColors.secondary,
+                                        backgroundColor:
+                                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Ahorrado: ${fmt.format(g.currentAmount)}',
+                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                        Text('Falta: ${fmt.format(g.remaining)}',
+                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: OutlinedButton.icon(
+                                        onPressed: () => _showContributeDialog(context, ref, g),
+                                        icon: const Icon(Icons.savings_outlined, size: 16),
+                                        label: const Text('Abonar'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -191,6 +292,39 @@ class GoalsScreen extends ConsumerWidget {
       builder: (_) => _GoalSheet(
         existing: g,
         onSaved: () => ref.invalidate(goalsProvider),
+      ),
+    );
+  }
+
+  void _showGoalActionsSheet(BuildContext context, WidgetRef ref, GoalModel g) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar meta'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditGoalSheet(context, ref, g);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar meta', style: TextStyle(color: AppColors.expense)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDeleteGoal(context, ref, g);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -263,6 +397,33 @@ class GoalsScreen extends ConsumerWidget {
   }
 }
 
+class _AnimatedCardEntry extends StatelessWidget {
+  const _AnimatedCardEntry({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = (index * 0.04).clamp(0.0, 0.55);
+    final end = (start + 0.32).clamp(0.0, 1.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+      builder: (context, value, child) {
+        final y = (1 - value) * 10;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, y), child: child),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
 // ─── Goal Sheet (Add + Edit) ─────────────────────────────────────────────────
 
 class _GoalSheet extends ConsumerStatefulWidget {
@@ -278,9 +439,36 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _amountCtrl;
-  late final TextEditingController _iconCtrl;
+  late String _selectedIcon;
   DateTime? _targetDate;
   bool _saving = false;
+
+  static const _emojiOptions = [
+    '🎯',
+    '💰',
+    '🏠',
+    '🚗',
+    '✈️',
+    '🎓',
+    '💍',
+    '🧰',
+    '🛡️',
+    '📱',
+    '💻',
+    '👶',
+    '🐶',
+    '🏖️',
+    '🎁',
+    '🧳',
+    '🏍️',
+    '📷',
+    '🎮',
+    '🩺',
+    '🛠️',
+    '🏆',
+    '🌟',
+    '📚',
+  ];
 
   bool get _isEditing => widget.existing != null;
 
@@ -291,7 +479,7 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _amountCtrl = TextEditingController(
         text: e != null ? e.targetAmount.toStringAsFixed(2) : '');
-    _iconCtrl = TextEditingController(text: e?.icon ?? '🎯');
+    _selectedIcon = (e?.icon != null && e!.icon.isNotEmpty) ? e.icon : '🎯';
     if (e?.targetDate != null && e!.targetDate!.isNotEmpty) {
       _targetDate = DateTime.tryParse(e.targetDate!);
     }
@@ -301,8 +489,62 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
   void dispose() {
     _nameCtrl.dispose();
     _amountCtrl.dispose();
-    _iconCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _showEmojiPicker() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Selecciona un emoji', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                itemCount: _emojiOptions.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                ),
+                itemBuilder: (_, i) {
+                  final emoji = _emojiOptions[i];
+                  final isSelected = emoji == _selectedIcon;
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => Navigator.pop(ctx, emoji),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      setState(() => _selectedIcon = selected);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -324,7 +566,7 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
         'name': _nameCtrl.text.trim(),
         'targetAmount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
       };
-      if (_iconCtrl.text.trim().isNotEmpty) body['icon'] = _iconCtrl.text.trim();
+      body['icon'] = _selectedIcon;
       if (_targetDate != null) body['targetDate'] = _targetDate!.toIso8601String().split('T')[0];
       if (_isEditing) {
         await dio.patch('${ApiConstants.goals}/${widget.existing!.id}', data: body);
@@ -373,9 +615,30 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
               },
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _iconCtrl,
-              decoration: const InputDecoration(labelText: 'Ícono (emoji)', hintText: '🎯'),
+            Text('Ícono', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _emojiOptions.take(8).map((emoji) {
+                      final selected = emoji == _selectedIcon;
+                      return ChoiceChip(
+                        label: Text(emoji, style: const TextStyle(fontSize: 18)),
+                        selected: selected,
+                        onSelected: (_) => setState(() => _selectedIcon = emoji),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _showEmojiPicker,
+                  icon: const Icon(Icons.emoji_emotions_outlined, size: 18),
+                  label: const Text('Ver más'),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ListTile(

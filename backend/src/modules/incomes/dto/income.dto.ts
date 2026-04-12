@@ -66,6 +66,10 @@ export class UpdateIncomeDto {
   payDay2?: number;
 
   @IsOptional()
+  @IsDateString()
+  nextExpectedAt?: string;
+
+  @IsOptional()
   isActive?: boolean;
 
   @IsOptional()

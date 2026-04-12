@@ -42,6 +42,8 @@ class ApiConstants {
 
   // Insights
   static const String insights = '/insights';
+  static const String insightsRegenerate = '/insights/regenerate';
+  static const String insightsAchievements = '/insights/achievements';
 
   // Rules
   static const String rules = '/rules';
@@ -49,4 +51,5 @@ class ApiConstants {
   // Credit Cards
   static const String creditCards = '/credit-cards';
   static const String creditCardsSummary = '/credit-cards/summary';
+  static String creditCardPayments(String cardId) => '/credit-cards/$cardId/payments';
 }

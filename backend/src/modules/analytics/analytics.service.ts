@@ -18,6 +18,7 @@ export interface DashboardData {
   todaySpent: number;
   cashRunoutDate: string | null;
   creditCardTotal: number;
+  creditCardTotalUSD: number;
 }
 
 export interface SpendingTrend {
@@ -57,6 +58,7 @@ export class AnalyticsService {
     const today = new Date();
     const period = getCurrentPeriod(today, cycle, payDay1, payDay2);
     const daysRemaining = daysRemainingInPeriod(today, period.periodEnd);
+    const incomeEnd = today < period.periodEnd ? today : period.periodEnd;
 
     const startStr = period.periodStart.toISOString().split('T')[0];
     const endStr = period.periodEnd.toISOString().split('T')[0];
@@ -77,37 +79,77 @@ export class AnalyticsService {
         .getRawOne<{ total: string }>(),
       this.expenseRepo
         .createQueryBuilder('e')
-        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .select('e.currency', 'currency')
+        .addSelect('COALESCE(SUM(e.amount), 0)', 'total')
         .where('e.userId = :userId AND e.paymentMethod = :method AND e.date BETWEEN :start AND :end', {
           userId, method: 'card_credit', start: startStr, end: endStr,
         })
-        .getRawOne<{ total: string }>(),
+        .groupBy('e.currency')
+        .getRawMany<{ currency: string; total: string }>(),
     ]);
 
-    // Calculate expected income for this period based on each source's cycle.
-    // periodDays = number of days in the period (inclusive).
+    // Income basis for the current period:
+    // 1) If an income has recorded receipts, use those real records.
+    // 2) Otherwise, project from nextExpectedAt + cycle up to today.
+    // 3) Legacy fallback for recurring incomes with no date configured.
+    const recordRows = await this.incomeRecordRepo
+      .createQueryBuilder('r')
+      .select('r.incomeId', 'incomeId')
+      .addSelect('COALESCE(SUM(r.amount), 0)', 'total')
+      .where('r.userId = :userId AND r.receivedAt BETWEEN :start AND :end', {
+        userId,
+        start: startStr,
+        end: incomeEnd.toISOString().split('T')[0],
+      })
+      .groupBy('r.incomeId')
+      .getRawMany<{ incomeId: string; total: string }>();
+
+    const recordsByIncome = new Map(
+      recordRows.map((r) => [r.incomeId, parseFloat(r.total ?? '0')]),
+    );
+
     const periodDays = this.daysBetween(period.periodStart, period.periodEnd) + 1;
     const cycleDaysMap: Record<string, number> = {
       [IncomeCycle.WEEKLY]: 7,
       [IncomeCycle.BIWEEKLY]: 14,
       [IncomeCycle.MONTHLY]: 30,
     };
+
     let totalIncome = 0;
     for (const src of incomeSources) {
-      const amount = Number(src.amount);
-      if (src.cycle === IncomeCycle.ONE_TIME) {
-        totalIncome += amount;
-      } else {
+      const recorded = recordsByIncome.get(src.id);
+      if (recorded != null) {
+        totalIncome += recorded;
+        continue;
+      }
+
+      if (src.nextExpectedAt) {
+        const expectedCount = this.countExpectedOccurrencesInRange(
+          src,
+          period.periodStart,
+          incomeEnd,
+        );
+        totalIncome += Number(src.amount) * expectedCount;
+        continue;
+      }
+
+      // Backward compatibility: recurring sources without configured date.
+      if (src.cycle !== IncomeCycle.ONE_TIME) {
         const cycleDays = cycleDaysMap[src.cycle] ?? 30;
-        // How many times this income recurs in the period (at least 1)
         const occurrences = Math.max(1, Math.floor(periodDays / cycleDays));
-        totalIncome += amount * occurrences;
+        totalIncome += Number(src.amount) * occurrences;
       }
     }
 
     const totalSpent = parseFloat(spentResult?.total ?? '0');
     const todaySpent = parseFloat(todayResult?.total ?? '0');
-    const creditCardTotal = parseFloat(creditResult?.total ?? '0');
+    const creditCardRows = creditResult as { currency: string; total: string }[];
+    const creditCardTotal = parseFloat(
+      creditCardRows.find(r => r.currency === 'HNL')?.total ?? '0'
+    );
+    const creditCardTotalUSD = parseFloat(
+      creditCardRows.find(r => r.currency === 'USD')?.total ?? '0'
+    );
     const available = totalIncome - totalSpent;
     const safeDailySpend = daysRemaining > 0 ? available / daysRemaining : 0;
 
@@ -138,6 +180,7 @@ export class AnalyticsService {
       todaySpent,
       cashRunoutDate,
       creditCardTotal,
+      creditCardTotalUSD,
     };
   }
 
@@ -287,9 +330,9 @@ export class AnalyticsService {
   // ── Private helpers ─────────────────────────────────────────────────────
 
   /**
-   * Derives the pay period cycle and cut days from the user's income sources.
-   * Uses the income source with the highest amount as the "primary" income.
-   * Falls back to the user's configured payCycle if no incomes exist.
+    * Derives pay period configuration for dashboard boundaries.
+    * payCycle always comes from user settings so changing it has immediate effect.
+    * If a primary income defines cut days, those can refine biweekly limits.
    */
   private async getUserPeriodInfo(userId: string): Promise<{
     user: User;
@@ -303,31 +346,79 @@ export class AnalyticsService {
       this.incomeRepo.find({ where: { userId, isActive: true } }),
     ]);
 
-    let cycle: PayCycle = user!.payCycle as PayCycle;
+    const cycle: PayCycle = (user!.payCycle as PayCycle) ?? 'monthly';
+
+    let payDay1 = user!.payDay1 ?? 15;
+    let payDay2 = user!.payDay2 ?? 30;
 
     if (incomeSources.length > 0) {
-      // Pick the income with the highest amount as the primary
       const primary = incomeSources.reduce((a, b) =>
         Number(a.amount) >= Number(b.amount) ? a : b,
       );
-      const c = primary.cycle as string;
-      // Map income cycle names to period PayCycle (one_time treated as monthly)
-      const cycleMap: Record<string, PayCycle> = {
-        weekly: 'weekly',
-        biweekly: 'biweekly',
-        monthly: 'monthly',
-        one_time: 'monthly',
-      };
-      cycle = cycleMap[c] ?? 'monthly';
+      if (typeof primary.payDay1 === 'number') payDay1 = primary.payDay1;
+      if (typeof primary.payDay2 === 'number') payDay2 = primary.payDay2;
     }
 
     return {
       user: user!,
       cycle,
-      payDay1: user!.payDay1 ?? 15,
-      payDay2: user!.payDay2 ?? 30,
+      payDay1,
+      payDay2,
       incomeSources,
     };
+  }
+
+  private countExpectedOccurrencesInRange(income: Income, rangeStart: Date, rangeEnd: Date): number {
+    if (!income.nextExpectedAt) return 0;
+
+    const start = this.toDateOnly(rangeStart);
+    const end = this.toDateOnly(rangeEnd);
+    let cursor = this.toDateOnly(new Date(income.nextExpectedAt));
+
+    if (cursor > end) {
+      while (cursor > end) {
+        cursor = this.shiftByCycle(cursor, income.cycle, -1);
+      }
+    }
+
+    while (cursor < start) {
+      cursor = this.shiftByCycle(cursor, income.cycle, 1);
+    }
+
+    let count = 0;
+    let guard = 0;
+    while (cursor <= end && guard < 500) {
+      count += 1;
+      cursor = this.shiftByCycle(cursor, income.cycle, 1);
+      guard += 1;
+    }
+
+    return count;
+  }
+
+  private shiftByCycle(base: Date, cycle: IncomeCycle, direction: 1 | -1): Date {
+    const d = this.toDateOnly(base);
+    if (cycle === IncomeCycle.WEEKLY) {
+      d.setDate(d.getDate() + 7 * direction);
+      return d;
+    }
+    if (cycle === IncomeCycle.BIWEEKLY) {
+      d.setDate(d.getDate() + 14 * direction);
+      return d;
+    }
+    if (cycle === IncomeCycle.MONTHLY) {
+      d.setMonth(d.getMonth() + direction);
+      return d;
+    }
+    // one_time
+    d.setDate(d.getDate() + 3650 * direction);
+    return d;
+  }
+
+  private toDateOnly(date: Date): Date {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 
   private async getSpendingByCategory(

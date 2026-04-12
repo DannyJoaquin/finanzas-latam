@@ -1,4 +1,5 @@
-import {
+﻿import {
+  IsDateString,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -83,4 +84,26 @@ export class UpdateCreditCardDto {
   @IsString()
   @Length(3, 3)
   limitCurrency?: string;
+}
+
+export class RecordCardPaymentDto {
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  /** ISO date string (YYYY-MM-DD) */
+  @IsDateString()
+  paymentDate: string;
+
+  /** Billing cycle start this payment covers (YYYY-MM-DD) */
+  @IsDateString()
+  cycleStart: string;
+
+  /** Billing cycle end this payment covers (YYYY-MM-DD) */
+  @IsDateString()
+  cycleEnd: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

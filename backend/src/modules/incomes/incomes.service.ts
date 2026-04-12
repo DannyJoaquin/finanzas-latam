@@ -41,7 +41,12 @@ export class IncomesService {
 
   async update(userId: string, id: string, dto: UpdateIncomeDto): Promise<Income> {
     const income = await this.findOne(userId, id);
-    Object.assign(income, dto);
+    Object.assign(income, {
+      ...dto,
+      ...(dto.nextExpectedAt !== undefined
+          ? { nextExpectedAt: dto.nextExpectedAt ? new Date(dto.nextExpectedAt) : null }
+          : {}),
+    });
     return this.incomeRepo.save(income);
   }
 

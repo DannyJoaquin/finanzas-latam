@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../home/providers/dashboard_provider.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/presentation/widgets/app_error_widget.dart';
 
 class IncomeModel {
   const IncomeModel({
@@ -14,6 +17,7 @@ class IncomeModel {
     required this.type,
     required this.cycle,
     required this.isActive,
+    this.nextExpectedAt,
   });
 
   final String id;
@@ -22,6 +26,7 @@ class IncomeModel {
   final String type;
   final String cycle;
   final bool isActive;
+  final String? nextExpectedAt;
 
   factory IncomeModel.fromJson(Map<String, dynamic> j) => IncomeModel(
         id: j['id'] as String,
@@ -31,6 +36,7 @@ class IncomeModel {
         type: j['type'] as String? ?? 'salary',
         cycle: j['cycle'] as String? ?? 'monthly',
         isActive: j['isActive'] as bool? ?? true,
+        nextExpectedAt: (j['nextExpectedAt'] as String?)?.substring(0, 10),
       );
 }
 
@@ -64,10 +70,15 @@ class IncomesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final incomesAsync = ref.watch(incomesProvider);
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: 'L ');
+    final fmt = ref.watch(currencyFmtProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mis Ingresos')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddIncomeSheet(context, ref),
         icon: const Icon(Icons.add),
@@ -75,53 +86,165 @@ class IncomesScreen extends ConsumerWidget {
       ),
       body: incomesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(incomesProvider)),
         data: (incomes) => incomes.isEmpty
             ? const Center(child: Text('No tienes ingresos configurados.\nToca + para agregar uno.', textAlign: TextAlign.center))
             : RefreshIndicator(
                 onRefresh: () => ref.refresh(incomesProvider.future),
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  itemCount: incomes.length,
+                  itemCount: incomes.length + 1,
                   itemBuilder: (_, i) {
-                    final inc = incomes[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                          child: Icon(Icons.attach_money,
-                              color: Theme.of(context).colorScheme.onSecondaryContainer),
-                        ),
-                        title: Text(inc.sourceName,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(
-                          '${_typeLabels[inc.type] ?? inc.type} · ${_cycleLabels[inc.cycle] ?? inc.cycle}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              fmt.format(inc.amount),
-                              style: const TextStyle(
-                                  color: AppColors.income, fontWeight: FontWeight.bold),
+                    if (i == 0) {
+                      final total = incomes.fold<double>(0, (s, e) => s + e.amount);
+                      final active = incomes.where((e) => e.isActive).length;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ingresos',
+                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$monthTitle · ${incomes.length} ${incomes.length == 1 ? 'fuente' : 'fuentes'}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Theme.of(context).shadowColor.withAlpha(14),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 7),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ingresos configurados',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    fmt.format(total),
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                          color: AppColors.income,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$active activos · ${incomes.length} fuentes',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, size: 20),
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showEditIncomeSheet(context, ref, inc);
-                                } else if (value == 'delete') {
-                                  _confirmDelete(context, ref, inc);
-                                }
-                              },
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('Editar')])),
-                                PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: AppColors.expense), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: AppColors.expense))])),
-                              ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    final inc = incomes[i - 1];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).shadowColor.withAlpha(14),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
                             ),
                           ],
+                        ),
+                        child: _AnimatedCardEntry(
+                          index: i,
+                          child: Material(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(22),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: () => _showIncomeActionsSheet(context, ref, inc),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.income.withAlpha(24),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.attach_money, color: AppColors.income),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            inc.sourceName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${_typeLabels[inc.type] ?? inc.type} · ${_cycleLabels[inc.cycle] ?? inc.cycle}${inc.nextExpectedAt != null ? ' · Próximo: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(inc.nextExpectedAt!))}' : ''}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          fmt.format(inc.amount),
+                                          style: const TextStyle(
+                                            color: AppColors.income,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Icon(Icons.chevron_right,
+                                            size: 16,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -151,6 +274,39 @@ class IncomesScreen extends ConsumerWidget {
     );
   }
 
+  void _showIncomeActionsSheet(BuildContext context, WidgetRef ref, IncomeModel inc) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar ingreso'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditIncomeSheet(context, ref, inc);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar ingreso', style: TextStyle(color: AppColors.expense)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(context, ref, inc);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, IncomeModel inc) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -172,11 +328,41 @@ class IncomesScreen extends ConsumerWidget {
       final dio = ref.read(dioProvider);
       await dio.delete('${ApiConstants.incomes}/${inc.id}');
       ref.invalidate(incomesProvider);
+      // Regenerate insights since income change affects risk projections
+      dio.post(ApiConstants.insightsRegenerate).ignore();
+      ref.invalidate(insightsProvider);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+}
+
+class _AnimatedCardEntry extends StatelessWidget {
+  const _AnimatedCardEntry({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = (index * 0.04).clamp(0.0, 0.55);
+    final end = (start + 0.32).clamp(0.0, 1.0);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+      builder: (context, value, child) {
+        final y = (1 - value) * 10;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, y), child: child),
+        );
+      },
+      child: child,
+    );
   }
 }
 
@@ -197,14 +383,15 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
   late final TextEditingController _amountCtrl;
   late String _type;
   late String _cycle;
+  DateTime? _nextExpectedAt;
   bool _saving = false;
 
   bool get _isEditing => widget.existing != null;
 
   static const _types = ['salary', 'variable', 'remittance', 'freelance', 'other'];
   static const _typeLabels = ['Salario', 'Variable', 'Remesa', 'Freelance', 'Otro'];
-  static const _cycles = ['weekly', 'biweekly', 'monthly'];
-  static const _cycleLabels = ['Semanal', 'Quincenal', 'Mensual'];
+  static const _cycles = ['weekly', 'biweekly', 'monthly', 'one_time'];
+  static const _cycleLabels = ['Semanal', 'Quincenal', 'Mensual', 'Único'];
 
   @override
   void initState() {
@@ -215,6 +402,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
         text: e != null ? e.amount.toStringAsFixed(2) : '');
     _type = e?.type ?? 'salary';
     _cycle = e?.cycle ?? 'monthly';
+    _nextExpectedAt = e?.nextExpectedAt != null ? DateTime.parse(e!.nextExpectedAt!) : null;
   }
 
   @override
@@ -234,6 +422,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
         'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
         'type': _type,
         'cycle': _cycle,
+        'nextExpectedAt': _nextExpectedAt?.toIso8601String().substring(0, 10),
       };
       if (_isEditing) {
         await dio.patch('${ApiConstants.incomes}/${widget.existing!.id}', data: body);
@@ -241,6 +430,9 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
         await dio.post(ApiConstants.incomes, data: body);
       }
       widget.onSaved();
+      // Regenerate insights since income change affects risk projections
+      dio.post(ApiConstants.insightsRegenerate).ignore();
+      ref.invalidate(insightsProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -252,6 +444,9 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final nextDateLabel = _nextExpectedAt == null
+        ? 'Sin fecha'
+        : DateFormat('dd/MM/yyyy').format(_nextExpectedAt!);
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottom),
       child: Form(
@@ -281,7 +476,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(labelText: 'Tipo'),
               items: List.generate(_types.length,
                   (i) => DropdownMenuItem(value: _types[i], child: Text(_typeLabels[i]))),
@@ -289,11 +484,44 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _cycle,
+              initialValue: _cycle,
               decoration: const InputDecoration(labelText: 'Frecuencia'),
               items: List.generate(_cycles.length,
                   (i) => DropdownMenuItem(value: _cycles[i], child: Text(_cycleLabels[i]))),
               onChanged: (v) => setState(() => _cycle = v!),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _nextExpectedAt ?? now,
+                  firstDate: DateTime(now.year - 2),
+                  lastDate: DateTime(now.year + 5),
+                );
+                if (picked != null) {
+                  setState(() => _nextExpectedAt = picked);
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Próxima fecha de pago (opcional)',
+                  prefixIcon: Icon(Icons.event_outlined),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(nextDateLabel)),
+                    if (_nextExpectedAt != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        tooltip: 'Quitar fecha',
+                        onPressed: () => setState(() => _nextExpectedAt = null),
+                      ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton(

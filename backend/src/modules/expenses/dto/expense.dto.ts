@@ -54,6 +54,11 @@ export class CreateExpenseDto {
   creditCardId?: string;
 
   @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
+  @IsOptional()
   @IsEnum(ExpenseSource)
   source?: ExpenseSource;
 }
@@ -87,6 +92,11 @@ export class UpdateExpenseDto {
   @IsOptional()
   @IsUUID()
   creditCardId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
 }
 
 export class FilterExpensesDto {
@@ -105,6 +115,10 @@ export class FilterExpensesDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsUUID()
+  creditCardId?: string;
 
   @IsOptional()
   search?: string;

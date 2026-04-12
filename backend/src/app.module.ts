@@ -30,11 +30,17 @@ import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard'
 // Jobs
 import { InsightsGeneratorJob } from './jobs/insights-generator.job';
 import { BudgetAlertsJob } from './jobs/budget-alerts.job';
+import { DailyReminderJob } from './jobs/daily-reminder.job';
+import { WeeklySummaryJob } from './jobs/weekly-summary.job';
+
+// Common services
+import { PushNotificationService } from './common/services/push-notification.service';
 
 // Entities for job repositories
 import { User } from './modules/users/user.entity';
 import { Budget } from './modules/budgets/budget.entity';
 import { Expense } from './modules/expenses/expense.entity';
+import { Insight } from './modules/insights/insight.entity';
 
 @Module({
   imports: [
@@ -80,7 +86,7 @@ import { Expense } from './modules/expenses/expense.entity';
     ScheduleModule.forRoot(),
 
     // ── Feature modules ───────────────────────────────────────────────────
-    TypeOrmModule.forFeature([User, Budget, Expense]),
+    TypeOrmModule.forFeature([User, Budget, Expense, Insight]),
     AuthModule,
     UsersModule,
     CategoriesModule,
@@ -102,6 +108,10 @@ import { Expense } from './modules/expenses/expense.entity';
     // Cron jobs
     InsightsGeneratorJob,
     BudgetAlertsJob,
+    DailyReminderJob,
+    WeeklySummaryJob,
+    // Shared services
+    PushNotificationService,
   ],
 })
 export class AppModule {}

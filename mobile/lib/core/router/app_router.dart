@@ -14,9 +14,14 @@ import '../../features/incomes/presentation/screens/incomes_screen.dart';
 import '../../features/budgets/presentation/screens/budgets_screen.dart';
 import '../../features/goals/presentation/screens/goals_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
+import '../../features/analytics/presentation/screens/simulator_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/categories_management_screen.dart';
 import '../../features/cash/presentation/screens/cash_screen.dart';
 import '../../features/credit_cards/presentation/screens/credit_cards_screen.dart';
+import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/rules/presentation/screens/rules_screen.dart';
+import '../../features/achievements/presentation/screens/achievements_screen.dart';
 import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/app_shell.dart';
 
@@ -28,6 +33,7 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const pinSetup = '/pin-setup';
+  static const onboarding = '/onboarding';
   static const home = '/home';
   static const expenses = '/expenses';
   static const addExpense = '/expenses/add';
@@ -35,7 +41,11 @@ class AppRoutes {
   static const budgets = '/budgets';
   static const goals = '/goals';
   static const analytics = '/analytics';
+  static const simulator = '/simulator';
+  static const rules = '/rules';
+  static const achievements = '/achievements';
   static const settings = '/settings';
+  static const settingsCategories = '/settings/categories';
   static const cash = '/cash';
   static const creditCards = '/credit-cards';
 }
@@ -70,10 +80,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == AppRoutes.register ||
           state.matchedLocation == AppRoutes.pinSetup;
       final isSplash = state.matchedLocation == AppRoutes.splash;
+      final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
 
       if (isSplash) return null; // Let splash decide
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
-      if (isLoggedIn && isAuthRoute) return AppRoutes.home;
+      if (isLoggedIn && isAuthRoute) {
+        // Show onboarding first if not done
+        if (!hasCompletedOnboarding()) return AppRoutes.onboarding;
+        return AppRoutes.home;
+      }
+      // Redirect authenticated user to onboarding if not completed
+      if (isLoggedIn && !isOnboarding && !hasCompletedOnboarding()) {
+        return AppRoutes.onboarding;
+      }
       return null;
     },
     routes: [
@@ -93,6 +112,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.pinSetup,
         builder: (c, s) => const PinSetupScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.onboarding,
+        builder: (c, s) => const OnboardingScreen(),
+      ),
       ShellRoute(
         builder: (c, s, child) => AppShell(child: child),
         routes: [
@@ -111,7 +134,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: AppRoutes.budgets, builder: (c, s) => const BudgetsScreen()),
           GoRoute(path: AppRoutes.goals, builder: (c, s) => const GoalsScreen()),
           GoRoute(path: AppRoutes.analytics, builder: (c, s) => const AnalyticsScreen()),
-          GoRoute(path: AppRoutes.settings, builder: (c, s) => const SettingsScreen()),
+          GoRoute(path: AppRoutes.simulator, builder: (c, s) => const SimulatorScreen()),
+          GoRoute(path: AppRoutes.rules, builder: (c, s) => const RulesScreen()),
+          GoRoute(path: AppRoutes.achievements, builder: (c, s) => const AchievementsScreen()),
+          GoRoute(
+            path: AppRoutes.settings,
+            builder: (c, s) => const SettingsScreen(),
+            routes: [
+              GoRoute(
+                path: 'categories',
+                builder: (c, s) => const CategoriesManagementScreen(),
+              ),
+            ],
+          ),
           GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
           GoRoute(path: AppRoutes.creditCards, builder: (c, s) => const CreditCardsScreen()),
         ],

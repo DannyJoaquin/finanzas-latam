@@ -4,7 +4,16 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { InsightsService } from './insights.service';
 import { Insight } from './insight.entity';
 
+const createQbMock = (items: any[] = []) => ({
+  where: jest.fn().mockReturnThis(),
+  andWhere: jest.fn().mockReturnThis(),
+  orderBy: jest.fn().mockReturnThis(),
+  take: jest.fn().mockReturnThis(),
+  getMany: jest.fn().mockResolvedValue(items),
+});
+
 const mockInsightRepo = () => ({
+  createQueryBuilder: jest.fn(),
   find: jest.fn(),
   findOne: jest.fn(),
   save: jest.fn(),
@@ -48,20 +57,23 @@ describe('InsightsService', () => {
   describe('findActive', () => {
     it('returns only non-dismissed insights, ordered by generatedAt DESC, limit 20', async () => {
       const insights = [mockInsight()];
-      repo.find.mockResolvedValue(insights);
+      const qb = createQbMock(insights);
+      repo.createQueryBuilder.mockReturnValue(qb);
 
       const result = await service.findActive(userId);
 
-      expect(repo.find).toHaveBeenCalledWith({
-        where: { userId, isDismissed: false },
-        order: { generatedAt: 'DESC' },
-        take: 20,
-      });
+      expect(repo.createQueryBuilder).toHaveBeenCalledWith('i');
+      expect(qb.where).toHaveBeenCalledWith('i.userId = :userId', { userId });
+      expect(qb.andWhere).toHaveBeenNthCalledWith(1, 'i.isDismissed = false');
+      expect(qb.andWhere).toHaveBeenNthCalledWith(2, '(i.expiresAt IS NULL OR i.expiresAt > NOW())');
+      expect(qb.orderBy).toHaveBeenCalledWith('i.generatedAt', 'DESC');
+      expect(qb.take).toHaveBeenCalledWith(20);
       expect(result).toEqual(insights);
     });
 
     it('returns empty array when no active insights', async () => {
-      repo.find.mockResolvedValue([]);
+      const qb = createQbMock([]);
+      repo.createQueryBuilder.mockReturnValue(qb);
       const result = await service.findActive(userId);
       expect(result).toEqual([]);
     });

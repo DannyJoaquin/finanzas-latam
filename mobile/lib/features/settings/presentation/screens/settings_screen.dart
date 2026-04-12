@@ -1,8 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/providers/auth_provider.dart';
 
@@ -13,39 +16,74 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).valueOrNull?.user;
     final themeMode = ref.watch(themeNotifierProvider);
+    final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
+    final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajustes')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const SizedBox.shrink(),
+      ),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          Text(
+            'Configuración',
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$monthTitle · Preferencias de tu cuenta',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+
           // Profile header
           if (user != null)
-            ListTile(
-              contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-              leading: CircleAvatar(
-                radius: 26,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                child: Text(
-                  user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: Theme.of(context).colorScheme.primary,
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).shadowColor.withAlpha(14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                leading: CircleAvatar(
+                  radius: 26,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Text(
+                    user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
-              ),
-              title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(user.email),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _showEditProfileSheet(context, ref, user),
-                tooltip: 'Editar perfil',
+                title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(user.email),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _showEditProfileSheet(context, ref, user),
+                  tooltip: 'Editar perfil',
+                ),
               ),
             ),
-          const Divider(),
+          const SizedBox(height: 12),
 
           // Appearance
-          _SectionHeader(title: 'Apariencia'),
+          const _SectionHeader(title: 'Apariencia'),
           SwitchListTile(
             title: const Text('Modo oscuro'),
             secondary: const Icon(Icons.dark_mode_outlined),
@@ -55,7 +93,7 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
 
           // Account
-          _SectionHeader(title: 'Cuenta'),
+          const _SectionHeader(title: 'Cuenta'),
           ListTile(
             leading: const Icon(Icons.person_outlined),
             title: const Text('Editar perfil'),
@@ -71,7 +109,7 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
 
           // Preferences
-          _SectionHeader(title: 'Preferencias'),
+          const _SectionHeader(title: 'Preferencias'),
           ListTile(
             leading: const Icon(Icons.currency_exchange),
             title: const Text('Moneda'),
@@ -92,8 +130,16 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _showCurrencyPicker(context, ref, user?.currency ?? 'HNL'),
           ),
           ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('Categorías'),
+            subtitle: const Text('Agregar, editar y eliminar categorías'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.settingsCategories),
+          ),
+          ListTile(
             leading: const Icon(Icons.calendar_today_outlined),
             title: const Text('Ciclo de pago'),
+            subtitle: const Text('Define los límites del período mostrado en Inicio'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -114,6 +160,7 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.event_outlined),
               title: const Text('Días de corte'),
+              subtitle: const Text('Determinan cuándo inicia y termina cada quincena'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -131,6 +178,28 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => _showPayDayPicker(
                 context, ref, user?.payDay1 ?? 15, user?.payDay2 ?? 30),
             ),
+          const Divider(),
+
+          // Tools
+          const _SectionHeader(title: 'Herramientas'),
+          ListTile(
+            leading: const Icon(Icons.calculate_outlined),
+            title: const Text('Simulador de ahorro'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.simulator),
+          ),
+          ListTile(
+            leading: const Icon(Icons.rule_outlined),
+            title: const Text('Reglas automáticas'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.rules),
+          ),
+          ListTile(
+            leading: const Icon(Icons.emoji_events_outlined),
+            title: const Text('Logros y medallas'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.achievements),
+          ),
           const Divider(),
 
           // Danger zone
@@ -184,7 +253,6 @@ class SettingsScreen extends ConsumerWidget {
       isScrollControlled: true,
       builder: (_) => _EditProfileSheet(
         currentName: user?.fullName ?? '',
-        currentCurrency: user?.currency ?? 'HNL',
         onSaved: () => ref.invalidate(authStateProvider),
       ),
     );
@@ -387,7 +455,7 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          'Períodos: 1–${d1}  y  ${d1 + 1}–$d2',
+                          'Períodos: 1–$d1  y  ${d1 + 1}–$d2',
                           style: const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
@@ -476,11 +544,9 @@ class SettingsScreen extends ConsumerWidget {
 class _EditProfileSheet extends ConsumerStatefulWidget {
   const _EditProfileSheet({
     required this.currentName,
-    required this.currentCurrency,
     required this.onSaved,
   });
   final String currentName;
-  final String currentCurrency;
   final VoidCallback onSaved;
 
   @override
@@ -490,16 +556,12 @@ class _EditProfileSheet extends ConsumerStatefulWidget {
 class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
-  late String _currency;
   bool _saving = false;
-
-  static const _currencies = ['HNL', 'USD', 'GTQ', 'MXN', 'CRC', 'NIO'];
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.currentName);
-    _currency = _currencies.contains(widget.currentCurrency) ? widget.currentCurrency : 'HNL';
   }
 
   @override
@@ -515,7 +577,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       final dio = ref.read(dioProvider);
       await dio.patch(ApiConstants.me, data: {
         'fullName': _nameCtrl.text.trim(),
-        'currency': _currency,
       });
       widget.onSaved();
       if (mounted) Navigator.pop(context);
@@ -553,15 +614,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 prefixIcon: Icon(Icons.person_outline),
               ),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _currency,
-              decoration: const InputDecoration(labelText: 'Moneda'),
-              items: _currencies
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _currency = v!),
             ),
             const SizedBox(height: 24),
             FilledButton(

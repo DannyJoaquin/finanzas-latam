@@ -35,18 +35,37 @@ class NotificationService {
         ?.requestNotificationsPermission();
   }
 
+  Future<void> showInstant({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    await _plugin.show(
+      id,
+      title,
+      body,
+      _details(importance: Importance.max, priority: Priority.high),
+      payload: payload,
+    );
+  }
+
   /// Call on app startup and whenever the cards list changes.
   Future<void> rescheduleAll(List<CreditCardSummary> cards) async {
-    // Cancel previous credit card notifications (ids 100–299)
-    for (int i = 100; i < 300; i++) {
+    // Cancel previous credit card notifications (ids 100–599, supports up to 50 cards)
+    for (int i = 100; i < 600; i++) {
       await _plugin.cancel(i);
     }
 
     int base = 100;
     for (final card in cards) {
       await _scheduleCutOffWarning(card, base);
-      await _schedulePaymentReminders(card, base + 1);
-      if (card.overdueBalance > 0) {
+      // Skip payment reminder if status is already fully paid
+      if (card.paymentStatus != 'paid') {
+        await _schedulePaymentReminders(card, base + 1);
+      }
+      // Overdue reminder only if there is unpaid closed-cycle debt
+      if (card.overdueBalance > 0 && card.paymentStatus != 'paid') {
         await _scheduleOverdueReminder(card, base + 3);
       }
       base += 10;
