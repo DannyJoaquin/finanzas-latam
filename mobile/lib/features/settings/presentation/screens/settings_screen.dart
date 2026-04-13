@@ -7,6 +7,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/providers/experience_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -16,6 +17,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).valueOrNull?.user;
     final themeMode = ref.watch(themeNotifierProvider);
+    final isSimple = ref.watch(isSimpleModeProvider);
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
@@ -136,27 +138,28 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go(AppRoutes.settingsCategories),
           ),
-          ListTile(
-            leading: const Icon(Icons.calendar_today_outlined),
-            title: const Text('Ciclo de pago'),
-            subtitle: const Text('Define los límites del período mostrado en Inicio'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _cycleLabel(user?.payCycle ?? 'monthly'),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600,
+          if (!isSimple)
+            ListTile(
+              leading: const Icon(Icons.calendar_today_outlined),
+              title: const Text('Ciclo de pago'),
+              subtitle: const Text('Define los límites del período mostrado en Inicio'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _cycleLabel(user?.payCycle ?? 'monthly'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right),
-              ],
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              onTap: () => _showCyclePicker(context, ref, user?.payCycle ?? 'monthly'),
             ),
-            onTap: () => _showCyclePicker(context, ref, user?.payCycle ?? 'monthly'),
-          ),
-          if (user?.payCycle == 'biweekly')
+          if (!isSimple && user?.payCycle == 'biweekly')
             ListTile(
               leading: const Icon(Icons.event_outlined),
               title: const Text('Días de corte'),
@@ -180,8 +183,25 @@ class SettingsScreen extends ConsumerWidget {
             ),
           const Divider(),
 
+          // Experience mode
+          const _SectionHeader(title: 'Modo de experiencia'),
+          const _ExperienceModePicker(),
+          const Divider(),
+
+          // Notification preferences
+          const _SectionHeader(title: 'Notificaciones'),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('Preferencias de notificaciones'),
+            subtitle: const Text('Push, tarjetas y centro de avisos'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.settingsNotifications),
+          ),
+          const Divider(),
+
           // Tools
-          const _SectionHeader(title: 'Herramientas'),
+          if (!isSimple) ...[
+            const _SectionHeader(title: 'Herramientas'),
           ListTile(
             leading: const Icon(Icons.calculate_outlined),
             title: const Text('Simulador de ahorro'),
@@ -200,7 +220,15 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go(AppRoutes.achievements),
           ),
+          ListTile(
+            leading: const Icon(Icons.request_quote_outlined),
+            title: const Text('Calculadora de préstamos'),
+            subtitle: const Text('Cuota y tabla de amortización'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.loanCalculator),
+          ),
           const Divider(),
+          ], // end if (!isSimple)
 
           // Danger zone
           ListTile(
@@ -654,5 +682,114 @@ class _SectionHeader extends StatelessWidget {
       ),
     );
   }
-
 }
+
+// ────────────────────────────────────────────────────────
+// Experience mode picker widget
+// ────────────────────────────────────────────────────────
+class _ExperienceModePicker extends ConsumerWidget {
+  const _ExperienceModePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(experienceModeProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          _ModeCard(
+            icon: Icons.wb_sunny_outlined,
+            label: 'Simple',
+            description: 'Esencial y sin distracciones',
+            selected: current == 'simple',
+            onTap: () => ref.read(experienceModeNotifierProvider.notifier).setMode('simple'),
+            colorScheme: colorScheme,
+          ),
+          const SizedBox(width: 10),
+          _ModeCard(
+            icon: Icons.analytics_outlined,
+            label: 'Avanzado',
+            description: 'Insights, reglas y más',
+            selected: current == 'advanced',
+            onTap: () => ref.read(experienceModeNotifierProvider.notifier).setMode('advanced'),
+            colorScheme: colorScheme,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeCard extends StatelessWidget {
+  const _ModeCard({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+    required this.colorScheme,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? colorScheme.primaryContainer : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).shadowColor.withAlpha(14),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? colorScheme.primary : colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: selected ? colorScheme.primary.withAlpha(180) : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, Length } from 'class-validator';
-import { PayCycle } from '../user.entity';
+import { ExperienceMode, PayCycle } from '../user.entity';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -38,4 +38,8 @@ export class UpdateUserDto {
 
   @IsOptional()
   fcmToken?: string;
+
+  @IsOptional()
+  @IsEnum(ExperienceMode)
+  experienceMode?: ExperienceMode;
 }

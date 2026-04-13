@@ -17,11 +17,13 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/analytics/presentation/screens/simulator_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/categories_management_screen.dart';
+import '../../features/settings/presentation/screens/notification_settings_screen.dart';
 import '../../features/cash/presentation/screens/cash_screen.dart';
 import '../../features/credit_cards/presentation/screens/credit_cards_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/rules/presentation/screens/rules_screen.dart';
 import '../../features/achievements/presentation/screens/achievements_screen.dart';
+import '../../features/settings/presentation/screens/loan_calculator_screen.dart';
 import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/app_shell.dart';
 
@@ -46,8 +48,10 @@ class AppRoutes {
   static const achievements = '/achievements';
   static const settings = '/settings';
   static const settingsCategories = '/settings/categories';
+  static const settingsNotifications = '/settings/notifications';
   static const cash = '/cash';
   static const creditCards = '/credit-cards';
+  static const loanCalculator = '/loan-calculator';
 }
 
 // A ChangeNotifier that GoRouter uses as refreshListenable.
@@ -145,10 +149,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: 'categories',
                 builder: (c, s) => const CategoriesManagementScreen(),
               ),
+              GoRoute(
+                path: 'notifications',
+                builder: (c, s) => const NotificationSettingsScreen(),
+              ),
             ],
           ),
           GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
           GoRoute(path: AppRoutes.creditCards, builder: (c, s) => const CreditCardsScreen()),
+          GoRoute(path: AppRoutes.loanCalculator, builder: (c, s) => const LoanCalculatorScreen()),
         ],
       ),
     ],

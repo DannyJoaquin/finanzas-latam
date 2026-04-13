@@ -1,4 +1,4 @@
-services:
+﻿services:
   api:
     build:
       context: ./backend
@@ -7,6 +7,9 @@ services:
     restart: unless-stopped
     ports:
       - '3000:3000'
+    env_file:
+      - path: ./backend/.env.firebase
+        required: false
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -24,6 +27,8 @@ services:
       JWT_REFRESH_EXPIRES_IN: 30d
       ENCRYPTION_KEY: dev-32-char-key-change-in-prod!!
       GOOGLE_CLIENT_ID: 642124641220-oh2b998fll013blsj104l8v0gmrpoko8.apps.googleusercontent.com
+      # Paste your Firebase Admin SDK JSON (minified) here to enable push notifications.
+      # Get it from: Firebase Console â†’ Project Settings â†’ Service Accounts â†’ Generate new private key
     command: npm run start:dev
     volumes:
       - ./backend/src:/app/src

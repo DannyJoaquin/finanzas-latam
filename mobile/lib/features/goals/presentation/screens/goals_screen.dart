@@ -7,6 +7,7 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
+import '../../../../core/providers/experience_provider.dart';
 
 class GoalModel {
   const GoalModel({
@@ -59,6 +60,7 @@ class GoalsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final goalsAsync = ref.watch(goalsProvider);
     final fmt = ref.watch(currencyFmtProvider);
+    final isSimple = ref.watch(isSimpleModeProvider);
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
@@ -137,9 +139,10 @@ class GoalsScreen extends ConsumerWidget {
                                   const SizedBox(height: 6),
                                   Text(
                                     '${fmt.format(totalSaved)} / ${fmt.format(totalTarget)}',
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                    style: (isSimple
+                                            ? Theme.of(context).textTheme.headlineMedium
+                                            : Theme.of(context).textTheme.headlineSmall)
+                                        ?.copyWith(fontWeight: FontWeight.w800),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -158,12 +161,14 @@ class GoalsScreen extends ConsumerWidget {
 
                     final g = goals[i - 1];
                     final pctLabel = '${(g.progress * 100).toStringAsFixed(0)}%';
+                    final itemRadius = isSimple ? 24.0 : 22.0;
+                    final iconSize = isSimple ? 60.0 : 50.0;
 
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
+                      padding: EdgeInsets.only(bottom: isSimple ? 16 : 14),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(itemRadius),
                           boxShadow: [
                             BoxShadow(
                               color: Theme.of(context).shadowColor.withAlpha(14),
@@ -176,28 +181,28 @@ class GoalsScreen extends ConsumerWidget {
                           index: i,
                           child: Material(
                             color: Theme.of(context).colorScheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(itemRadius),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(itemRadius),
                               onTap: () => _showGoalActionsSheet(context, ref, g),
                               child: Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(isSimple ? 20 : 16),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
                                         Container(
-                                          width: 50,
-                                          height: 50,
+                                          width: iconSize,
+                                          height: iconSize,
                                           decoration: BoxDecoration(
                                             color: AppColors.secondary.withAlpha(18),
-                                            borderRadius: BorderRadius.circular(16),
+                                            borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
                                           ),
                                           alignment: Alignment.center,
                                           child: Text(
                                             g.icon == '' || g.icon.isEmpty ? '🎯' : g.icon,
-                                            style: const TextStyle(fontSize: 26),
+                                            style: TextStyle(fontSize: isSimple ? 32 : 26),
                                           ),
                                         ),
                                         const SizedBox(width: 10),
@@ -206,15 +211,15 @@ class GoalsScreen extends ConsumerWidget {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(g.name,
-                                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: isSimple ? 22 : 18)),
                                               if (g.targetDate != null && g.targetDate!.isNotEmpty)
                                                 Text(
                                                   'Meta: ${g.targetDate}',
                                                   style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
+                                                    fontSize: isSimple ? 13 : 11,
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                   ),
                                                 ),
                                             ],
@@ -222,14 +227,15 @@ class GoalsScreen extends ConsumerWidget {
                                         ),
                                         Text(
                                           pctLabel,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: AppColors.secondary,
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 18,
+                                            fontSize: isSimple ? 22 : 18,
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        Icon(Icons.chevron_right, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                        Icon(Icons.chevron_right, size: 18,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
@@ -237,7 +243,7 @@ class GoalsScreen extends ConsumerWidget {
                                       borderRadius: BorderRadius.circular(8),
                                       child: LinearProgressIndicator(
                                         value: g.progress,
-                                        minHeight: 10,
+                                        minHeight: isSimple ? 12 : 10,
                                         color: AppColors.secondary,
                                         backgroundColor:
                                             Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -248,9 +254,13 @@ class GoalsScreen extends ConsumerWidget {
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text('Ahorrado: ${fmt.format(g.currentAmount)}',
-                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                            style: TextStyle(
+                                                fontSize: isSimple ? 14 : 12,
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                         Text('Falta: ${fmt.format(g.remaining)}',
-                                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                            style: TextStyle(
+                                                fontSize: isSimple ? 14 : 12,
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                       ],
                                     ),
                                     const SizedBox(height: 10),

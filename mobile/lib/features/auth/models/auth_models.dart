@@ -8,6 +8,7 @@ class UserModel {
     this.payDay1,
     this.payDay2,
     this.avatarUrl,
+    this.experienceMode = 'advanced',
   });
 
   final String id;
@@ -18,6 +19,7 @@ class UserModel {
   final int? payDay1;
   final int? payDay2;
   final String? avatarUrl;
+  final String experienceMode;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: json['id'] as String,
@@ -28,6 +30,7 @@ class UserModel {
         payDay1: json['payDay1'] as int?,
         payDay2: json['payDay2'] as int?,
         avatarUrl: json['avatarUrl'] as String?,
+        experienceMode: json['experienceMode'] as String? ?? 'advanced',
       );
 
   Map<String, dynamic> toJson() => {
@@ -39,6 +42,7 @@ class UserModel {
         if (payDay1 != null) 'payDay1': payDay1,
         if (payDay2 != null) 'payDay2': payDay2,
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        'experienceMode': experienceMode,
       };
 }
 

@@ -151,3 +151,73 @@ final categoriesProvider = FutureProvider.autoDispose<List<CategoryOption>>((ref
   }
   return result;
 });
+
+// ── Category suggestion (auto-categorization) ─────────────────────────────
+
+class CategorySuggestion {
+  const CategorySuggestion({
+    required this.categoryId,
+    required this.categoryName,
+    required this.confidence,
+    required this.source,
+    this.matchedKeyword,
+  });
+
+  final String? categoryId;
+  final String? categoryName;
+  /// 'high' | 'medium' | 'low' | 'none'
+  final String confidence;
+  /// 'user_learning' | 'keyword_rule' | 'merchant_rule' | 'none'
+  final String source;
+  /// What keyword/merchant triggered the match — for display hint
+  final String? matchedKeyword;
+
+  bool get hasSuggestion => confidence != 'none' && categoryId != null;
+  bool get isHighConfidence => confidence == 'high';
+  bool get isMediumConfidence => confidence == 'medium';
+
+  factory CategorySuggestion.fromJson(Map<String, dynamic> j) => CategorySuggestion(
+        categoryId: j['suggestedCategoryId'] as String?,
+        categoryName: j['suggestedCategoryName'] as String?,
+        confidence: j['confidence'] as String? ?? 'none',
+        source: j['source'] as String? ?? 'none',
+        matchedKeyword: j['matchedKeyword'] as String?,
+      );
+}
+
+/// Calls POST /expenses/suggest-category and returns a suggestion.
+/// Returns null silently if the request fails or description is empty.
+Future<CategorySuggestion?> suggestCategory(dynamic dio, String description) async {
+  if (description.trim().length < 3) return null;
+  try {
+    final resp = await dio.post(
+      '${ApiConstants.expenses}/suggest-category',
+      data: {'description': description.trim()},
+    );
+    final result = CategorySuggestion.fromJson(resp.data as Map<String, dynamic>);
+    return result.hasSuggestion ? result : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Fire-and-forget: sends feedback about which category the user chose.
+/// Does NOT await or throw — safe to call from _save().
+void sendCategorizationFeedback(
+  dynamic dio,
+  String description,
+  String selectedCategoryId, {
+  bool remember = false,
+}) {
+  if (description.trim().isEmpty) return;
+  dio
+      .post(
+        '/categorization/feedback',
+        data: {
+          'description': description.trim(),
+          'selectedCategoryId': selectedCategoryId,
+          if (remember) 'remember': true,
+        },
+      )
+      .catchError((_) {});
+}

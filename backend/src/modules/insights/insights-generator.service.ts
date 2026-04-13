@@ -1,10 +1,14 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Insight, InsightPriority, InsightType } from './insight.entity';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { User } from '../users/user.entity';
 import { Expense } from '../expenses/expense.entity';
+import { Budget } from '../budgets/budget.entity';
+import { INSIGHT_COOLDOWN_HOURS } from '../../common/services/notification-routing.service';
+import { PushNotificationService } from '../../common/services/push-notification.service';
+import { NotificationPreferencesService } from '../users/notification-preferences.service';
 
 @Injectable()
 export class InsightsGeneratorService {
@@ -15,10 +19,14 @@ export class InsightsGeneratorService {
     private userRepo: Repository<User>,
     @InjectRepository(Expense)
     private expenseRepo: Repository<Expense>,
+    @InjectRepository(Budget)
+    private budgetRepo: Repository<Budget>,
     private analyticsService: AnalyticsService,
+    private pushService: PushNotificationService,
+    private notificationPrefsService: NotificationPreferencesService,
   ) {}
 
-  /** Run for a single user — called by cron job or on-demand */
+  /** Run for a single user â€” called by cron job or on-demand */
   async generateForUser(userId: string): Promise<void> {
     await Promise.all([
       this.generateAnomalyInsights(userId),
@@ -34,20 +42,19 @@ export class InsightsGeneratorService {
   /**
    * Returns true if a non-dismissed, non-expired insight of the given type
    * already exists for this user. Used by all generators to avoid duplicates.
+   * Cooldown is per-type to prevent over-notification.
    */
   private async hasActiveInsight(userId: string, type: InsightType): Promise<boolean> {
-    // Block regeneration if:
-    //  a) a non-dismissed, non-expired insight of this type already exists, OR
-    //  b) an insight of this type was generated within the last 4 hours (even if dismissed)
-    //     — this prevents on-demand triggers from immediately undoing a "dismiss all".
-    const cooldownDate = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const cooldownHours = INSIGHT_COOLDOWN_HOURS[type] ?? 24;
+    const cooldownDate = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
     const count = await this.insightRepo
       .createQueryBuilder('i')
       .where('i.userId = :userId', { userId })
       .andWhere('i.type = :type', { type })
       .andWhere(
-        '(i.isDismissed = false AND (i.expiresAt IS NULL OR i.expiresAt > NOW())) ' +
-        'OR i.generatedAt > :cooldownDate',
+        // Wrap both branches so the OR doesn't escape the user_id + type filter
+        '((i.isDismissed = false AND (i.expiresAt IS NULL OR i.expiresAt > NOW())) ' +
+        'OR i.generatedAt > :cooldownDate)',
         { cooldownDate },
       )
       .getCount();
@@ -58,6 +65,51 @@ export class InsightsGeneratorService {
   private expiresInDays(days: number): Date {
     const capped = Math.min(days, 7);
     return new Date(Date.now() + capped * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Sends a push notification for a newly created insight, respecting the
+   * user's push-notification preferences. Never throws â€” push failure is
+   * non-fatal so it never interrupts insight generation.
+   */
+  private async sendInsightPush(insight: Insight, userId: string): Promise<void> {
+    try {
+      const user = await this.userRepo.findOne({
+        where: { id: userId },
+        select: ['id', 'fcmToken'],
+      });
+      if (!user?.fcmToken) return;
+
+      const prefs = await this.notificationPrefsService.findOrCreateDefaults(userId);
+
+      const pushEnabled = (() => {
+        switch (insight.type) {
+          case InsightType.PROJECTION:
+            return prefs.pushCriticalFinancialAlerts;
+          case InsightType.ANOMALY:
+          case InsightType.BUDGET_WARNING:
+          case InsightType.SAVINGS_OPPORTUNITY:
+            return prefs.pushImportantInsights;
+          case InsightType.STREAK:
+          case InsightType.ACHIEVEMENT:
+            return prefs.pushMotivation;
+          default:
+            return false; // PATTERN (LOW) â€” no push
+        }
+      })();
+
+      if (!pushEnabled) return;
+
+      await this.pushService.send({
+        userId,
+        fcmToken: user.fcmToken,
+        title: insight.title,
+        body: insight.body,
+        data: { type: insight.type, insightId: insight.id },
+      });
+    } catch {
+      // Push failure is non-fatal â€” insight was already saved
+    }
   }
 
   private async generateAnomalyInsights(userId: string): Promise<void> {
@@ -72,7 +124,7 @@ export class InsightsGeneratorService {
         type: InsightType.ANOMALY,
         priority: anomaly.severity === 'high' ? InsightPriority.HIGH : InsightPriority.MEDIUM,
         title: `Gasto inusual en ${anomaly.categoryName}`,
-        body: `Esta semana gastaste ${multiplier}x más de lo normal en ${anomaly.categoryName}. ` +
+        body: `Esta semana gastaste ${multiplier}x mÃ¡s de lo normal en ${anomaly.categoryName}. ` +
           `Promedio semanal: L ${anomaly.avgWeeklyTotal.toFixed(0)}, esta semana: L ${anomaly.currentWeekTotal.toFixed(0)}.`,
         metadata: {
           categoryId: anomaly.categoryId,
@@ -83,7 +135,8 @@ export class InsightsGeneratorService {
         },
         expiresAt: this.expiresInDays(7),
       });
-      await this.insightRepo.save(insight);
+      const savedAnomaly = await this.insightRepo.save(insight);
+      await this.sendInsightPush(savedAnomaly, userId);
     }
   }
 
@@ -109,8 +162,8 @@ export class InsightsGeneratorService {
       userId,
       type: InsightType.PROJECTION,
       priority: InsightPriority.CRITICAL,
-      title: 'Tu dinero podría no alcanzar hasta la quincena',
-      body: `A tu ritmo actual de gastos, podrías quedarte sin fondos antes del final del período. ` +
+      title: 'Tu dinero podrÃ­a no alcanzar hasta la quincena',
+      body: `A tu ritmo actual de gastos, podrÃ­as quedarte sin fondos antes del final del perÃ­odo. ` +
         `Gasto diario seguro: L ${dashboard.safeDailySpend.toFixed(0)}. ` +
         (dashboard.cashRunoutDate
           ? `Estimado de quiebre: ${dashboard.cashRunoutDate}.`
@@ -122,11 +175,91 @@ export class InsightsGeneratorService {
       },
       expiresAt: this.expiresInDays(3),
     });
-    await this.insightRepo.save(insight);
+    const savedProjection = await this.insightRepo.save(insight);
+    await this.sendInsightPush(savedProjection, userId);
   }
 
   private async generateBudgetWarningInsights(userId: string): Promise<void> {
-    // Handled by BudgetAlertsJob (hourly cron). No duplicate generation needed.
+    if (await this.hasActiveInsight(userId, InsightType.BUDGET_WARNING)) return;
+
+    const now = new Date();
+    const activeBudgets = await this.budgetRepo.find({
+      where: { userId, isActive: true },
+    });
+
+    for (const budget of activeBudgets) {
+      const periodStart = new Date(budget.periodStart);
+      const periodEnd = new Date(budget.periodEnd);
+      const periodDays = Math.max(
+        1,
+        Math.round((periodEnd.getTime() - periodStart.getTime()) / 86400000),
+      );
+      const daysElapsed = Math.max(
+        1,
+        Math.round((now.getTime() - periodStart.getTime()) / 86400000),
+      );
+
+      // Query total spent for this budget in the current period
+      const result = await this.expenseRepo
+        .createQueryBuilder('e')
+        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .where('e.userId = :userId', { userId })
+        .andWhere('e.date BETWEEN :start AND :end', {
+          start: budget.periodStart,
+          end: budget.periodEnd,
+        })
+        .andWhere(
+          budget.categoryId ? 'e.category_id = :catId' : '1=1',
+          { catId: budget.categoryId },
+        )
+        .getRawOne<{ total: string }>();
+
+      const spent = parseFloat(result?.total ?? '0');
+      const budgetAmount = parseFloat(String(budget.amount)); // TypeORM returns numeric as string
+      const pctSpent = spent / budgetAmount;
+
+      // Skip if already at or over 80% â€” BudgetAlertsJob handles that threshold
+      if (pctSpent >= 0.8) continue;
+
+      // Calculate spend velocity: how fast spending is happening relative to budget period
+      const velocity = pctSpent / (daysElapsed / periodDays);
+
+      // Projected total by end of period
+      const projectedSpend = (spent / daysElapsed) * periodDays;
+      const willOvershoot = projectedSpend > budgetAmount;
+
+      const shouldWarn = velocity > 1.3 || willOvershoot;
+      if (!shouldWarn) continue;
+
+      const projectedPct = Math.round((projectedSpend / budgetAmount) * 100);
+      const priority = velocity > 1.5 ? InsightPriority.HIGH : InsightPriority.MEDIUM;
+
+      const insight = this.insightRepo.create({
+        userId,
+        type: InsightType.BUDGET_WARNING,
+        priority,
+        title: `Tu presupuesto "${budget.name}" va rápido`,
+        body:
+          `Llevas L ${spent.toFixed(0)} de L ${budgetAmount.toFixed(0)} ` +
+          `(${Math.round(pctSpent * 100)}%) y al ritmo actual ` +
+          `podrías llegar al ${projectedPct}% al finalizar el período.`,
+        metadata: {
+          budgetId: budget.id,
+          budgetName: budget.name,
+          spent,
+          budgetAmount,
+          pctSpent: Math.round(pctSpent * 100),
+          velocity: Math.round(velocity * 100) / 100,
+          projectedPct,
+          willOvershoot,
+        },
+        expiresAt: this.expiresInDays(1),
+      });
+      const savedBudgetWarn = await this.insightRepo.save(insight);
+      await this.sendInsightPush(savedBudgetWarn, userId);
+      // One warning per run is enough (re-runs are gated by the cooldown)
+      break;
+    }
   }
 
   /** Detect day-of-week spending patterns over the last 4 weeks */
@@ -158,21 +291,21 @@ export class InsightsGeneratorService {
 
     if (avg === 0 || topTotal < avg * 1.3) return;
 
-    const dayNames = ['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'];
-    const dayName = dayNames[parseInt(top.dow)] ?? 'ese día';
+    const dayNames = ['domingos', 'lunes', 'martes', 'miÃ©rcoles', 'jueves', 'viernes', 'sÃ¡bados'];
+    const dayName = dayNames[parseInt(top.dow)] ?? 'ese dÃ­a';
     const multiplier = Math.round((topTotal / avg) * 10) / 10;
 
     const insight = this.insightRepo.create({
       userId,
       type: InsightType.PATTERN,
       priority: InsightPriority.LOW,
-      title: `Gastas más los ${dayName}`,
+      title: `Gastas mÃ¡s los ${dayName}`,
       body: `Tus gastos los ${dayName} son ${multiplier}x tu promedio semanal. ` +
-        `Considera planificar con anticipación ese día.`,
+        `Considera planificar con anticipaciÃ³n ese dÃ­a.`,
       metadata: { dow: parseInt(top.dow), dayName, multiplier, avgTotal: Math.round(avg) },
       expiresAt: this.expiresInDays(7),
     });
-    await this.insightRepo.save(insight);
+    await this.insightRepo.save(insight); // PATTERN is LOW priority â€” no push
   }
 
   /** Find top spending category that represents >25% of income */
@@ -199,9 +332,9 @@ export class InsightsGeneratorService {
       type: InsightType.SAVINGS_OPPORTUNITY,
       priority: InsightPriority.MEDIUM,
       title: `${top.categoryName} consume el ${pctDisplay}% de tus ingresos`,
-      body: `Reducir un 20% en ${top.categoryName} te ahorraría ` +
-        `L ${simulation.projectedSavings.toFixed(0)}/mes — ` +
-        `L ${simulation.annualSavings.toFixed(0)} al año.`,
+      body: `Reducir un 20% en ${top.categoryName} te ahorrarÃ­a ` +
+        `L ${simulation.projectedSavings.toFixed(0)}/mes â€” ` +
+        `L ${simulation.annualSavings.toFixed(0)} al aÃ±o.`,
       metadata: {
         categoryId: top.categoryId,
         categoryName: top.categoryName,
@@ -211,10 +344,11 @@ export class InsightsGeneratorService {
       },
       expiresAt: this.expiresInDays(7),
     });
-    await this.insightRepo.save(insight);
+    const savedSavings = await this.insightRepo.save(insight);
+    await this.sendInsightPush(savedSavings, userId);
   }
 
-  // ── Streaks ──────────────────────────────────────────────────────────────
+  // â”€â”€ Streaks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /**
    * Counts consecutive days (ending today) where the user logged at least one expense.
@@ -232,10 +366,10 @@ export class InsightsGeneratorService {
     if (await this.hasActiveInsight(userId, InsightType.STREAK)) return;
 
     const messages: Record<number, { title: string; body: string }> = {
-      3:  { title: '¡3 días seguidos! 🎯', body: 'Llevas 3 días consecutivos registrando tus gastos. ¡Sigue así!' },
-      7:  { title: '¡Una semana completa! 🔥', body: '7 días seguidos registrando gastos. Tu hábito financiero se está formando.' },
-      14: { title: '¡Dos semanas de racha! ⚡', body: '14 días consecutivos. Estás construyendo un excelente control financiero.' },
-      30: { title: '¡Un mes completo! 🏆', body: '30 días de racha. Eres una persona con disciplina financiera ejemplar.' },
+      3:  { title: 'Â¡3 dÃ­as seguidos! ðŸŽ¯', body: 'Llevas 3 dÃ­as consecutivos registrando tus gastos. Â¡Sigue asÃ­!' },
+      7:  { title: 'Â¡Una semana completa! ðŸ”¥', body: '7 dÃ­as seguidos registrando gastos. Tu hÃ¡bito financiero se estÃ¡ formando.' },
+      14: { title: 'Â¡Dos semanas de racha! âš¡', body: '14 dÃ­as consecutivos. EstÃ¡s construyendo un excelente control financiero.' },
+      30: { title: 'Â¡Un mes completo! ðŸ†', body: '30 dÃ­as de racha. Eres una persona con disciplina financiera ejemplar.' },
     };
 
     const msg = messages[milestone] ?? messages[3];
@@ -244,11 +378,12 @@ export class InsightsGeneratorService {
       type: InsightType.STREAK,
       priority: milestone >= 14 ? InsightPriority.HIGH : InsightPriority.MEDIUM,
       title: msg.title,
-      body: `${msg.body} Racha actual: ${streak} días.`,
+      body: `${msg.body} Racha actual: ${streak} dÃ­as.`,
       metadata: { streakDays: streak, milestone },
       expiresAt: this.expiresInDays(3),
     });
-    await this.insightRepo.save(insight);
+    const savedStreak = await this.insightRepo.save(insight);
+    await this.sendInsightPush(savedStreak, userId);
   }
 
   private async _countConsecutiveDays(userId: string): Promise<number> {
@@ -285,7 +420,7 @@ export class InsightsGeneratorService {
     return streak;
   }
 
-  // ── Achievements ─────────────────────────────────────────────────────────
+  // â”€â”€ Achievements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /**
    * Checks user milestones and creates ACHIEVEMENT insights when they are first reached.
@@ -317,15 +452,16 @@ export class InsightsGeneratorService {
     const count = await this.expenseRepo.count({ where: { userId } });
     if (count < 1) return;
 
-    await this.insightRepo.save(this.insightRepo.create({
+    const savedFirst = await this.insightRepo.save(this.insightRepo.create({
       userId,
       type: InsightType.ACHIEVEMENT,
       priority: InsightPriority.LOW,
-      title: '¡Primer gasto registrado! 🎉',
-      body: 'Has registrado tu primer gasto. ¡Bienvenido a un mejor control financiero!',
+      title: 'Â¡Primer gasto registrado! ðŸŽ‰',
+      body: 'Has registrado tu primer gasto. Â¡Bienvenido a un mejor control financiero!',
       metadata: { key },
       expiresAt: this.expiresInDays(7),
     }));
+    await this.sendInsightPush(savedFirst, userId);
   }
 
   private async _checkExpenseCountAchievement(userId: string, threshold: number, label: string): Promise<void> {
@@ -335,14 +471,16 @@ export class InsightsGeneratorService {
     const count = await this.expenseRepo.count({ where: { userId } });
     if (count < threshold) return;
 
-    await this.insightRepo.save(this.insightRepo.create({
+    const savedCount = await this.insightRepo.save(this.insightRepo.create({
       userId,
       type: InsightType.ACHIEVEMENT,
       priority: InsightPriority.MEDIUM,
-      title: `¡Logro: ${label}! 🏅`,
+      title: `Â¡Logro: ${label}! ðŸ…`,
       body: `Llevas ${count} gastos registrados. Cada registro es un paso hacia mejor salud financiera.`,
       metadata: { key, threshold, actual: count },
       expiresAt: this.expiresInDays(7),
     }));
+    await this.sendInsightPush(savedCount, userId);
   }
 }
+

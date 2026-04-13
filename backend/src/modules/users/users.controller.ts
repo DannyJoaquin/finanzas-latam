@@ -11,7 +11,9 @@ import {
   ClassSerializerInterceptor,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { NotificationPreferencesService } from './notification-preferences.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from './user.entity';
 
@@ -19,7 +21,10 @@ import { User } from './user.entity';
 @SerializeOptions({ excludeExtraneousValues: false })
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private notificationPrefsService: NotificationPreferencesService,
+  ) {}
 
   @Get('me')
   getMe(@CurrentUser() user: User) {
@@ -35,5 +40,18 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteMe(@CurrentUser() user: User) {
     return this.usersService.softDelete(user.id);
+  }
+
+  @Get('me/notification-preferences')
+  getNotificationPrefs(@CurrentUser() user: User) {
+    return this.notificationPrefsService.findOrCreateDefaults(user.id);
+  }
+
+  @Patch('me/notification-preferences')
+  updateNotificationPrefs(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.notificationPrefsService.update(user.id, dto);
   }
 }

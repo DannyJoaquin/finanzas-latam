@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../home/providers/dashboard_provider.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
+import '../../../../core/providers/experience_provider.dart';
 
 class IncomeModel {
   const IncomeModel({
@@ -71,6 +72,7 @@ class IncomesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final incomesAsync = ref.watch(incomesProvider);
     final fmt = ref.watch(currencyFmtProvider);
+    final isSimple = ref.watch(isSimpleModeProvider);
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
 
@@ -144,7 +146,10 @@ class IncomesScreen extends ConsumerWidget {
                                   const SizedBox(height: 6),
                                   Text(
                                     fmt.format(total),
-                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    style: (isSimple
+                                            ? Theme.of(context).textTheme.headlineLarge
+                                            : Theme.of(context).textTheme.headlineMedium)
+                                        ?.copyWith(
                                           color: AppColors.income,
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -165,11 +170,13 @@ class IncomesScreen extends ConsumerWidget {
                     }
 
                     final inc = incomes[i - 1];
+                    final itemRadius = isSimple ? 24.0 : 22.0;
+                    final iconSize = isSimple ? 60.0 : 50.0;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
+                      padding: EdgeInsets.only(bottom: isSimple ? 16 : 14),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(itemRadius),
                           boxShadow: [
                             BoxShadow(
                               color: Theme.of(context).shadowColor.withAlpha(14),
@@ -182,23 +189,27 @@ class IncomesScreen extends ConsumerWidget {
                           index: i,
                           child: Material(
                             color: Theme.of(context).colorScheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(itemRadius),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(itemRadius),
                               onTap: () => _showIncomeActionsSheet(context, ref, inc),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: isSimple ? 20 : 14,
+                                    vertical: isSimple ? 20 : 12),
                                 child: Row(
                                   children: [
                                     Container(
-                                      width: 50,
-                                      height: 50,
+                                      width: iconSize,
+                                      height: iconSize,
                                       decoration: BoxDecoration(
                                         color: AppColors.income.withAlpha(24),
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
                                       ),
                                       alignment: Alignment.center,
-                                      child: const Icon(Icons.attach_money, color: AppColors.income),
+                                      child: Icon(Icons.attach_money,
+                                          color: AppColors.income,
+                                          size: isSimple ? 32 : 24),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -209,13 +220,15 @@ class IncomesScreen extends ConsumerWidget {
                                             inc.sourceName,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: isSimple ? 22 : 18),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${_typeLabels[inc.type] ?? inc.type} · ${_cycleLabels[inc.cycle] ?? inc.cycle}${inc.nextExpectedAt != null ? ' · Próximo: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(inc.nextExpectedAt!))}' : ''}',
+                                            '${_typeLabels[inc.type] ?? inc.type} · ${_cycleLabels[inc.cycle] ?? inc.cycle}${inc.nextExpectedAt != null ? ' · Pr\u00f3ximo: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(inc.nextExpectedAt!))}' : ''}',
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: isSimple ? 14 : 12,
                                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                           ),
@@ -228,10 +241,10 @@ class IncomesScreen extends ConsumerWidget {
                                       children: [
                                         Text(
                                           fmt.format(inc.amount),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: AppColors.income,
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 18,
+                                            fontSize: isSimple ? 20 : 18,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
@@ -417,12 +430,16 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
     setState(() => _saving = true);
     try {
       final dio = ref.read(dioProvider);
+      final isSimple = ref.read(isSimpleModeProvider);
+      final forceSimpleDefaults = isSimple && !_isEditing;
       final body = {
         'sourceName': _nameCtrl.text.trim(),
         'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
-        'type': _type,
-        'cycle': _cycle,
-        'nextExpectedAt': _nextExpectedAt?.toIso8601String().substring(0, 10),
+        'type': forceSimpleDefaults ? 'salary' : _type,
+        'cycle': forceSimpleDefaults ? 'monthly' : _cycle,
+        'nextExpectedAt': forceSimpleDefaults
+            ? null
+            : _nextExpectedAt?.toIso8601String().substring(0, 10),
       };
       if (_isEditing) {
         await dio.patch('${ApiConstants.incomes}/${widget.existing!.id}', data: body);
@@ -443,6 +460,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isSimple = ref.watch(isSimpleModeProvider);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final nextDateLabel = _nextExpectedAt == null
         ? 'Sin fecha'
@@ -474,55 +492,57 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _type,
-              decoration: const InputDecoration(labelText: 'Tipo'),
-              items: List.generate(_types.length,
-                  (i) => DropdownMenuItem(value: _types[i], child: Text(_typeLabels[i]))),
-              onChanged: (v) => setState(() => _type = v!),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _cycle,
-              decoration: const InputDecoration(labelText: 'Frecuencia'),
-              items: List.generate(_cycles.length,
-                  (i) => DropdownMenuItem(value: _cycles[i], child: Text(_cycleLabels[i]))),
-              onChanged: (v) => setState(() => _cycle = v!),
-            ),
-            const SizedBox(height: 16),
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () async {
-                final now = DateTime.now();
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _nextExpectedAt ?? now,
-                  firstDate: DateTime(now.year - 2),
-                  lastDate: DateTime(now.year + 5),
-                );
-                if (picked != null) {
-                  setState(() => _nextExpectedAt = picked);
-                }
-              },
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Próxima fecha de pago (opcional)',
-                  prefixIcon: Icon(Icons.event_outlined),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(nextDateLabel)),
-                    if (_nextExpectedAt != null)
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 18),
-                        tooltip: 'Quitar fecha',
-                        onPressed: () => setState(() => _nextExpectedAt = null),
-                      ),
-                  ],
+            if (!isSimple) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _type,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: List.generate(_types.length,
+                    (i) => DropdownMenuItem(value: _types[i], child: Text(_typeLabels[i]))),
+                onChanged: (v) => setState(() => _type = v!),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _cycle,
+                decoration: const InputDecoration(labelText: 'Frecuencia'),
+                items: List.generate(_cycles.length,
+                    (i) => DropdownMenuItem(value: _cycles[i], child: Text(_cycleLabels[i]))),
+                onChanged: (v) => setState(() => _cycle = v!),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _nextExpectedAt ?? now,
+                    firstDate: DateTime(now.year - 2),
+                    lastDate: DateTime(now.year + 5),
+                  );
+                  if (picked != null) {
+                    setState(() => _nextExpectedAt = picked);
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Próxima fecha de pago (opcional)',
+                    prefixIcon: Icon(Icons.event_outlined),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(nextDateLabel)),
+                      if (_nextExpectedAt != null)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          tooltip: 'Quitar fecha',
+                          onPressed: () => setState(() => _nextExpectedAt = null),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _saving ? null : _save,

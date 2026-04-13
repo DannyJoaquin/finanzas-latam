@@ -23,6 +23,11 @@ export enum PayCycle {
   MONTHLY = 'monthly',
 }
 
+export enum ExperienceMode {
+  SIMPLE = 'simple',
+  ADVANCED = 'advanced',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -60,6 +65,14 @@ export class User {
 
   @Column({ name: 'pay_day_1', type: 'smallint', nullable: true })
   payDay1: number;
+
+  @Column({
+    name: 'experience_mode',
+    type: 'enum',
+    enum: ExperienceMode,
+    default: ExperienceMode.ADVANCED,
+  })
+  experienceMode: ExperienceMode;
 
   @Column({ name: 'pay_day_2', type: 'smallint', nullable: true })
   payDay2: number;

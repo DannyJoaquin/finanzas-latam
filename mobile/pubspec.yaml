@@ -63,6 +63,7 @@ dependencies:
   flutter_local_notifications: ^18.0.0
   timezone: ^0.9.4
   google_sign_in: ^6.2.1
+  flutter_native_splash: ^2.4.1
 
 dev_dependencies:
   flutter_test:
@@ -84,3 +85,10 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/lottie/
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#111722"
+  android: true
+  ios: true
+  web: false

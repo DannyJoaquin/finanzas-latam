@@ -6,6 +6,8 @@ import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/exp
 import { parsePagination, buildMeta } from '../../common/utils/pagination.util';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CashTransaction, CashTxType } from '../cash/cash-transaction.entity';
+import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
+import { CategorizationLearningService } from '../categorization/categorization-learning.service';
 
 @Injectable()
 export class ExpensesService {
@@ -16,6 +18,8 @@ export class ExpensesService {
     private cashAccountRepo: Repository<CashAccount>,
     @InjectRepository(CashTransaction)
     private cashTxRepo: Repository<CashTransaction>,
+    private categorizationService: ExpenseCategorizationService,
+    private learningService: CategorizationLearningService,
   ) {}
 
   async findAll(userId: string, filters: FilterExpensesDto) {
@@ -71,7 +75,29 @@ export class ExpensesService {
       },
     });
     if (duplicate) throw new ConflictException('Duplicate expense detected: identical expense submitted within 5 seconds');
-    const expense = this.expenseRepo.create({ ...dto, userId, date: expenseDate });
+
+    // Auto-categorize if no category provided
+    let resolvedCategoryId = dto.categoryId;
+    let wasAutoAssigned = false;
+    let suggestionResult = null;
+    if (!resolvedCategoryId && dto.description?.trim()) {
+      try {
+        suggestionResult = await this.categorizationService.suggest(userId, dto.description);
+        if (this.categorizationService.shouldAutoAssign(suggestionResult.confidence)) {
+          resolvedCategoryId = suggestionResult.suggestedCategoryId ?? undefined;
+          wasAutoAssigned = true;
+        }
+      } catch {
+        // Auto-categorization is best-effort; don't fail the expense creation
+      }
+    }
+
+    const expense = this.expenseRepo.create({
+      ...dto,
+      categoryId: resolvedCategoryId,
+      userId,
+      date: expenseDate,
+    });
     let saved: Expense;
     try {
       saved = await this.expenseRepo.save(expense);
@@ -80,6 +106,18 @@ export class ExpensesService {
         throw new BadRequestException('Invalid categoryId: category does not exist');
       }
       throw err;
+    }
+
+    // Write audit log (best-effort)
+    if (suggestionResult && suggestionResult.confidence !== 'none') {
+      try {
+        await this.categorizationService.createAuditLog(
+          userId,
+          dto.description ?? null,
+          suggestionResult,
+          { expenseId: saved.id, wasAutoAssigned },
+        );
+      } catch { /* best-effort */ }
     }
 
     // Auto-deduct from cash account when payment method is cash
@@ -117,9 +155,27 @@ export class ExpensesService {
 
   async update(userId: string, id: string, dto: UpdateExpenseDto): Promise<Expense> {
     const expense = await this.findOne(userId, id);
+    const categoryChanged =
+      dto.categoryId !== undefined && dto.categoryId !== expense.categoryId;
+
     const updateData = { ...dto, ...(dto.date ? { date: new Date(dto.date) } : {}) };
     Object.assign(expense, updateData);
-    return this.expenseRepo.save(expense);
+    const saved = await this.expenseRepo.save(expense);
+
+    // Trigger learning when user manually changes the category
+    if (categoryChanged && dto.categoryId && expense.description) {
+      try {
+        await this.learningService.recordFeedback(
+          userId,
+          expense.description,
+          dto.categoryId,
+          { remember: false },
+        );
+        await this.categorizationService.markCorrected(userId, id, dto.categoryId);
+      } catch { /* best-effort */ }
+    }
+
+    return saved;
   }
 
   async remove(userId: string, id: string): Promise<void> {

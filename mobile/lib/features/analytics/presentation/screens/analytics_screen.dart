@@ -72,17 +72,20 @@ class PaymentTrendMonth {
     required this.cash,
     required this.cardDebit,
     required this.cardCredit,
+    required this.transfer,
   });
   final String month;
   final double cash;
   final double cardDebit;
   final double cardCredit;
+  final double transfer;
 
   factory PaymentTrendMonth.fromJson(Map<String, dynamic> j) => PaymentTrendMonth(
         month: j['month'] as String? ?? '',
         cash: (j['cash'] as num? ?? 0).toDouble(),
         cardDebit: (j['card_debit'] as num? ?? 0).toDouble(),
         cardCredit: (j['card_credit'] as num? ?? 0).toDouble(),
+      transfer: (j['transfer'] as num? ?? 0).toDouble(),
       );
 }
 
@@ -803,7 +806,8 @@ class _MethodsTab extends ConsumerWidget {
               if (months.isEmpty) return const SizedBox.shrink();
 
               final maxVal = months.fold(0.0, (m, t) {
-                final v = [t.cash, t.cardDebit, t.cardCredit].reduce((a, b) => a > b ? a : b);
+                final v = [t.cash, t.cardDebit, t.cardCredit, t.transfer]
+                    .reduce((a, b) => a > b ? a : b);
                 return v > m ? v : m;
               });
 
@@ -826,6 +830,12 @@ class _MethodsTab extends ConsumerWidget {
                     BarChartRodData(
                       toY: e.value.cardCredit,
                       color: _methodColors['card_credit']!,
+                      width: 10,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    BarChartRodData(
+                      toY: e.value.transfer,
+                      color: _methodColors['transfer']!,
                       width: 10,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                     ),
@@ -894,6 +904,8 @@ class _MethodsTab extends ConsumerWidget {
                       _Legend(color: _methodColors['card_debit']!, label: 'Débito'),
                       const SizedBox(width: 14),
                       _Legend(color: _methodColors['card_credit']!, label: 'Crédito'),
+                      const SizedBox(width: 14),
+                      _Legend(color: _methodColors['transfer']!, label: 'Transf.'),
                     ],
                   ),
                 ],

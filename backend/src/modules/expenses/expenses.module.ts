@@ -5,9 +5,13 @@ import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CashTransaction } from '../cash/cash-transaction.entity';
+import { CategorizationModule } from '../categorization/categorization.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Expense, CashAccount, CashTransaction])],
+  imports: [
+    TypeOrmModule.forFeature([Expense, CashAccount, CashTransaction]),
+    CategorizationModule,
+  ],
   controllers: [ExpensesController],
   providers: [ExpensesService],
   exports: [ExpensesService],

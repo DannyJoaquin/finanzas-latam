@@ -7,6 +7,7 @@ import { BudgetsService } from '../modules/budgets/budgets.service';
 import { Expense } from '../modules/expenses/expense.entity';
 import { User } from '../modules/users/user.entity';
 import { PushNotificationService } from '../common/services/push-notification.service';
+import { NotificationPreferencesService } from '../modules/users/notification-preferences.service';
 
 @Injectable()
 export class BudgetAlertsJob {
@@ -21,6 +22,7 @@ export class BudgetAlertsJob {
     private userRepo: Repository<User>,
     private budgetsService: BudgetsService,
     private pushService: PushNotificationService,
+    private notificationPrefsService: NotificationPreferencesService,
   ) {}
 
   /** Runs every hour */
@@ -76,6 +78,10 @@ export class BudgetAlertsJob {
         select: ['id', 'fcmToken'],
       });
       if (!user?.fcmToken) return;
+
+      // Respect user push preference for budget alerts
+      const prefs = await this.notificationPrefsService.findOrCreateDefaults(user.id);
+      if (!prefs.pushBudgetAlerts) return;
 
       const label = pct >= 100 ? 'agotado' : `al ${pct}%`;
       await this.pushService.send({

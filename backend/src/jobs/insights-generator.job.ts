@@ -3,9 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, In, Repository } from 'typeorm';
 import { User } from '../modules/users/user.entity';
-import { Insight, InsightPriority } from '../modules/insights/insight.entity';
+import { Insight, InsightPriority, InsightType } from '../modules/insights/insight.entity';
 import { InsightsGeneratorService } from '../modules/insights/insights-generator.service';
 import { PushNotificationService } from '../common/services/push-notification.service';
+import { NotificationPreferencesService } from '../modules/users/notification-preferences.service';
+import { NotificationRoutingService } from '../common/services/notification-routing.service';
 
 /** Priority order for picking which insight gets the push slot */
 const PRIORITY_ORDER: Record<InsightPriority, number> = {
@@ -26,6 +28,8 @@ export class InsightsGeneratorJob {
     private insightRepo: Repository<Insight>,
     private insightsGenerator: InsightsGeneratorService,
     private pushService: PushNotificationService,
+    private notificationPrefsService: NotificationPreferencesService,
+    private routingService: NotificationRoutingService,
   ) {}
 
   /** Runs every day at 2:00 AM server time */
@@ -52,8 +56,11 @@ export class InsightsGeneratorJob {
         await this.insightsGenerator.generateForUser(user.id);
         processed++;
 
-        // Find HIGH/CRITICAL insights freshly created this run
         if (user.fcmToken) {
+          const prefs = await this.notificationPrefsService.findOrCreateDefaults(user.id);
+
+          // Find HIGH/CRITICAL insights freshly created this run,
+          // excluding streak/achievement (motivation types)
           const freshInsights = await this.insightRepo
             .createQueryBuilder('i')
             .where('i.userId = :uid', { uid: user.id })
@@ -61,12 +68,20 @@ export class InsightsGeneratorJob {
             .andWhere('i.priority IN (:...priorities)', {
               priorities: [InsightPriority.HIGH, InsightPriority.CRITICAL],
             })
+            .andWhere('i.type NOT IN (:...excluded)', {
+              excluded: [InsightType.STREAK, InsightType.ACHIEVEMENT],
+            })
             .andWhere('i.generatedAt > :cutoff', { cutoff })
             .getMany();
 
-          if (freshInsights.length > 0) {
+          // Filter further by user prefs
+          const eligible = freshInsights.filter((insight) =>
+            this.routingService.shouldSendPush(insight.type, insight.priority, prefs),
+          );
+
+          if (eligible.length > 0) {
             // Send only the top-priority one to stay within the daily cap
-            const top = freshInsights.sort(
+            const top = eligible.sort(
               (a, b) => PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority],
             )[0];
             await this.pushService.send({
@@ -85,3 +100,4 @@ export class InsightsGeneratorJob {
     this.logger.log(`Insights generated for ${processed}/${users.length} users`);
   }
 }
+

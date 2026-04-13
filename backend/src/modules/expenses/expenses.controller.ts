@@ -15,10 +15,15 @@ import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/expense.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
+import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
+import { SuggestCategoryDto } from '../categorization/dto/categorization.dto';
 
 @Controller('expenses')
 export class ExpensesController {
-  constructor(private expensesService: ExpensesService) {}
+  constructor(
+    private expensesService: ExpensesService,
+    private categorizationService: ExpenseCategorizationService,
+  ) {}
 
   @Get()
   findAll(@CurrentUser() user: User, @Query() filters: FilterExpensesDto) {
@@ -32,6 +37,20 @@ export class ExpensesController {
     @Query('endDate') endDate?: string,
   ) {
     return this.expensesService.getSummary(user.id, startDate, endDate);
+  }
+
+  /**
+   * POST /expenses/suggest-category
+   * Returns a category suggestion for the given description.
+   * Does not persist anything — pure read.
+   */
+  @Post('suggest-category')
+  @HttpCode(HttpStatus.OK)
+  suggestCategory(
+    @CurrentUser() user: User,
+    @Body() dto: SuggestCategoryDto,
+  ) {
+    return this.categorizationService.suggest(user.id, dto.description);
   }
 
   @Get('summary-by-method')

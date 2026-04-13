@@ -52,4 +52,7 @@ class ApiConstants {
   static const String creditCards = '/credit-cards';
   static const String creditCardsSummary = '/credit-cards/summary';
   static String creditCardPayments(String cardId) => '/credit-cards/$cardId/payments';
+
+  // Notification Preferences
+  static const String notificationPreferences = '/users/me/notification-preferences';
 }

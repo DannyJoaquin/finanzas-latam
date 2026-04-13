@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/constants/currency_format.dart';
+import '../../../../core/providers/experience_provider.dart';
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
   Widget build(BuildContext context) {
     final expAsync = ref.watch(expensesProvider);
     final filter = ref.watch(_expensesFilterProvider);
+    final isSimple = ref.watch(isSimpleModeProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -288,7 +290,10 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 _formatMixedTotal(totalFiltered),
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                style: (isSimple
+                                        ? Theme.of(context).textTheme.headlineLarge
+                                        : Theme.of(context).textTheme.headlineMedium)
+                                    ?.copyWith(
                                       fontWeight: FontWeight.w800,
                                       color: AppColors.expense,
                                     ),
@@ -297,6 +302,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+                        if (!isSimple)
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
@@ -401,11 +407,13 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       // ── Expense row ───────────────────────────────
                       final e = item as ExpenseModel;
                       final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
+                      final iconSize = isSimple ? 62.0 : 52.0;
+                      final itemRadius = isSimple ? 24.0 : 22.0;
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        padding: EdgeInsets.fromLTRB(16, 0, 16, isSimple ? 16 : 14),
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(itemRadius),
                             boxShadow: [
                               BoxShadow(
                                 color: Theme.of(context).shadowColor.withAlpha(14),
@@ -418,27 +426,30 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             index: i,
                             child: Material(
                               color: Theme.of(context).colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(itemRadius),
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(22),
+                                borderRadius: BorderRadius.circular(itemRadius),
                                 onTap: _busy ? null : () => _showExpenseActionsSheet(context, e),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: isSimple ? 20 : 14,
+                                      vertical: isSimple ? 20 : 12),
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 52,
-                                        height: 52,
+                                        width: iconSize,
+                                        height: iconSize,
                                         decoration: BoxDecoration(
                                           color: AppColors.expense.withAlpha(20),
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
                                         ),
                                         alignment: Alignment.center,
                                         child: isEmoji
-                                            ? Text(e.categoryIcon, style: const TextStyle(fontSize: 24))
+                                            ? Text(e.categoryIcon,
+                                                style: TextStyle(fontSize: isSimple ? 30 : 24))
                                             : Icon(
                                                 materialIconFromString(e.categoryIcon),
-                                                size: 24,
+                                                size: isSimple ? 30 : 24,
                                                 color: AppColors.expense,
                                               ),
                                       ),
@@ -451,8 +462,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                               e.description.isEmpty ? e.categoryName : e.description,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 20,
+                                              style: TextStyle(
+                                                fontSize: isSimple ? 22 : 20,
                                                 fontWeight: FontWeight.w700,
                                               ),
                                             ),
@@ -460,7 +471,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                             Text(
                                               '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: isSimple ? 14 : 12,
                                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                                               ),
                                             ),
@@ -470,10 +481,10 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                       const SizedBox(width: 8),
                                       Text(
                                         '-${currencyFmt(e.currency).format(e.amount)}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: AppColors.expense,
                                           fontWeight: FontWeight.w700,
-                                          fontSize: 18,
+                                          fontSize: isSimple ? 20 : 18,
                                         ),
                                       ),
                                     ],
@@ -979,7 +990,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                       ? _selectedCategoryId
                       : null;
                   return DropdownButtonFormField<String>(
-                    initialValue: validId,
+                    value: validId,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     isExpanded: true,
                     items: cats.map((c) => DropdownMenuItem(

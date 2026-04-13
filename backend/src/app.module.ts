@@ -25,6 +25,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { RulesModule } from './modules/rules/rules.module';
 import { CreditCardsModule } from './modules/credit-cards/credit-cards.module';
+import { CategorizationModule } from './modules/categorization/categorization.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 
 // Jobs
@@ -35,6 +36,7 @@ import { WeeklySummaryJob } from './jobs/weekly-summary.job';
 
 // Common services
 import { PushNotificationService } from './common/services/push-notification.service';
+import { NotificationRoutingService } from './common/services/notification-routing.service';
 
 // Entities for job repositories
 import { User } from './modules/users/user.entity';
@@ -99,6 +101,7 @@ import { Insight } from './modules/insights/insight.entity';
     InsightsModule,
     RulesModule,
     CreditCardsModule,
+    CategorizationModule,
   ],
   providers: [
     // Global JWT guard — all routes require auth unless @Public()
@@ -112,6 +115,7 @@ import { Insight } from './modules/insights/insight.entity';
     WeeklySummaryJob,
     // Shared services
     PushNotificationService,
+    NotificationRoutingService,
   ],
 })
 export class AppModule {}

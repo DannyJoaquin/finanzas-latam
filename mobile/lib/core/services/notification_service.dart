@@ -3,6 +3,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
 import '../../../features/credit_cards/models/credit_card_model.dart';
+import '../../../features/settings/providers/notification_prefs_provider.dart'
+    show NotificationPreferencesModel;
 
 class NotificationService {
   NotificationService._();
@@ -51,7 +53,11 @@ class NotificationService {
   }
 
   /// Call on app startup and whenever the cards list changes.
-  Future<void> rescheduleAll(List<CreditCardSummary> cards) async {
+  /// Pass [prefs] to respect the user's local notification toggles.
+  Future<void> rescheduleAll(
+    List<CreditCardSummary> cards, [
+    NotificationPreferencesModel? prefs,
+  ]) async {
     // Cancel previous credit card notifications (ids 100–599, supports up to 50 cards)
     for (int i = 100; i < 600; i++) {
       await _plugin.cancel(i);
@@ -59,14 +65,20 @@ class NotificationService {
 
     int base = 100;
     for (final card in cards) {
-      await _scheduleCutOffWarning(card, base);
+      if (prefs == null || prefs.localCardCutoffAlerts) {
+        await _scheduleCutOffWarning(card, base);
+      }
       // Skip payment reminder if status is already fully paid
       if (card.paymentStatus != 'paid') {
-        await _schedulePaymentReminders(card, base + 1);
+        if (prefs == null || prefs.localCardDue5d || prefs.localCardDue1d) {
+          await _schedulePaymentReminders(card, base + 1, prefs: prefs);
+        }
       }
       // Overdue reminder only if there is unpaid closed-cycle debt
       if (card.overdueBalance > 0 && card.paymentStatus != 'paid') {
-        await _scheduleOverdueReminder(card, base + 3);
+        if (prefs == null || prefs.localCardPendingBalance) {
+          await _scheduleOverdueReminder(card, base + 3);
+        }
       }
       base += 10;
     }
@@ -92,12 +104,16 @@ class NotificationService {
     );
   }
 
-  Future<void> _schedulePaymentReminders(CreditCardSummary card, int id) async {
+  Future<void> _schedulePaymentReminders(
+    CreditCardSummary card,
+    int id, {
+    NotificationPreferencesModel? prefs,
+  }) async {
     final payDate = DateTime.parse(card.paymentDueDate);
     final now = DateTime.now();
 
     final fiveDaysBefore = payDate.subtract(const Duration(days: 5));
-    if (fiveDaysBefore.isAfter(now)) {
+    if ((prefs == null || prefs.localCardDue5d) && fiveDaysBefore.isAfter(now)) {
       await _plugin.zonedSchedule(
         id,
         '💳 Pago de ${card.name} vence en 5 días',
@@ -111,7 +127,7 @@ class NotificationService {
     }
 
     final oneDayBefore = payDate.subtract(const Duration(days: 1));
-    if (oneDayBefore.isAfter(now)) {
+    if ((prefs == null || prefs.localCardDue1d) && oneDayBefore.isAfter(now)) {
       await _plugin.zonedSchedule(
         id + 1,
         '🔴 ¡Mañana vence tu pago de ${card.name}!',
