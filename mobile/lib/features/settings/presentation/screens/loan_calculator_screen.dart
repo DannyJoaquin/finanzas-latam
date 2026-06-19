@@ -132,18 +132,32 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calculadora de Préstamos'),
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'Calculadora de Préstamos',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Simulador de crédito · Sistema Francés',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
               _InputCard(
                 amountCtrl: _amountCtrl,
                 rateCtrl: _rateCtrl,
@@ -195,109 +209,163 @@ class _InputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      color: cs.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.account_balance_outlined,
-                      color: cs.primary, size: 20),
+    final inputFill = cs.surfaceContainerHighest.withAlpha(80);
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    );
+    final inputFocusBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: cs.primary, width: 2),
+    );
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withAlpha(14),
+            blurRadius: 20,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  'Datos del préstamo',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Monto
-            TextFormField(
-              controller: amountCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Monto del préstamo',
-                hintText: '100000',
-                prefixText: 'L. ',
-                border: OutlineInputBorder(),
+                child: Icon(Icons.account_balance_outlined,
+                    color: cs.primary, size: 22),
               ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Ingresa el monto';
-                final val = double.tryParse(v.replaceAll(',', ''));
-                if (val == null || val <= 0) return 'Monto inválido';
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-
-            // Tasa anual
-            TextFormField(
-              controller: rateCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Tasa de interés anual',
-                hintText: '18.5',
-                suffixText: '%',
-                border: OutlineInputBorder(),
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Ingresa la tasa';
-                final val = double.tryParse(v.replaceAll(',', '.'));
-                if (val == null || val < 0) return 'Tasa inválida';
-                if (val > 300) return 'Tasa demasiado alta';
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-
-            // Plazo + toggle meses/años
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: termCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly
-                    ],
-                    decoration: InputDecoration(
-                      labelText: 'Plazo',
-                      hintText: termInMonths ? '36' : '3',
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Ingresa el plazo';
-                      final val = int.tryParse(v);
-                      if (val == null || val <= 0) return 'Plazo inválido';
-                      final months = termInMonths ? val : val * 12;
-                      if (months > 600) return 'Máx. 50 años';
-                      return null;
-                    },
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Datos del préstamo',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
+                  Text(
+                    'Completa los campos para calcular',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Monto
+          TextFormField(
+            controller: amountCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Monto del préstamo',
+              hintText: '100,000',
+              prefixIcon: const Icon(Icons.payments_outlined, size: 20),
+              suffixText: 'L',
+              filled: true,
+              fillColor: inputFill,
+              border: inputBorder,
+              enabledBorder: inputBorder,
+              focusedBorder: inputFocusBorder,
+              errorBorder: inputBorder.copyWith(
+                  borderSide: const BorderSide(color: Colors.red, width: 1)),
+              focusedErrorBorder: inputFocusBorder.copyWith(
+                  borderSide: const BorderSide(color: Colors.red, width: 2)),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Ingresa el monto';
+              final val = double.tryParse(v.replaceAll(',', ''));
+              if (val == null || val <= 0) return 'Monto inválido';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Tasa anual
+          TextFormField(
+            controller: rateCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Tasa de interés anual',
+              hintText: '18.5',
+              prefixIcon: const Icon(Icons.percent_outlined, size: 20),
+              suffixText: '%',
+              filled: true,
+              fillColor: inputFill,
+              border: inputBorder,
+              enabledBorder: inputBorder,
+              focusedBorder: inputFocusBorder,
+              errorBorder: inputBorder.copyWith(
+                  borderSide: const BorderSide(color: Colors.red, width: 1)),
+              focusedErrorBorder: inputFocusBorder.copyWith(
+                  borderSide: const BorderSide(color: Colors.red, width: 2)),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Ingresa la tasa';
+              final val = double.tryParse(v.replaceAll(',', '.'));
+              if (val == null || val < 0) return 'Tasa inválida';
+              if (val > 300) return 'Tasa demasiado alta';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Plazo + toggle meses/años
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: termCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Plazo',
+                    hintText: termInMonths ? '36' : '3',
+                    prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: inputBorder,
+                    enabledBorder: inputBorder,
+                    focusedBorder: inputFocusBorder,
+                    errorBorder: inputBorder.copyWith(
+                        borderSide: const BorderSide(color: Colors.red, width: 1)),
+                    focusedErrorBorder: inputFocusBorder.copyWith(
+                        borderSide: const BorderSide(color: Colors.red, width: 2)),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Ingresa el plazo';
+                    final val = int.tryParse(v);
+                    if (val == null || val <= 0) return 'Plazo inválido';
+                    final months = termInMonths ? val : val * 12;
+                    if (months > 600) return 'Máx. 50 años';
+                    return null;
+                  },
                 ),
-                const SizedBox(width: 12),
-                Padding(
+              ),
+              const SizedBox(width: 12),
+              Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: SegmentedButton<bool>(
                     segments: const [
@@ -335,8 +403,7 @@ class _InputCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 

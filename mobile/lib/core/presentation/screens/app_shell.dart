@@ -52,6 +52,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     AppRoutes.incomes,
     AppRoutes.budgets,
     AppRoutes.goals,
+    AppRoutes.shared,
   ];
 
   static const _tabsSimple = [
@@ -59,10 +60,11 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     AppRoutes.expenses,
     AppRoutes.incomes,
     AppRoutes.goals,
+    AppRoutes.shared,
   ];
 
-  static const _labelsAdvanced = ['Inicio', 'Gastos', 'Ingresos', 'Presup.', 'Metas'];
-  static const _labelsSimple = ['Inicio', 'Gastos', 'Ingresos', 'Metas'];
+  static const _labelsAdvanced = ['Inicio', 'Gastos', 'Ingresos', 'Presup.', 'Metas', 'Grupos'];
+  static const _labelsSimple = ['Inicio', 'Gastos', 'Ingresos', 'Metas', 'Grupos'];
 
   static const _iconsAdvanced = [
     Icons.home_outlined,
@@ -70,12 +72,14 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     Icons.trending_up_outlined,
     Icons.account_balance_wallet_outlined,
     Icons.savings_outlined,
+    Icons.group_outlined,
   ];
   static const _iconsSimple = [
     Icons.home_outlined,
     Icons.receipt_long_outlined,
     Icons.trending_up_outlined,
     Icons.savings_outlined,
+    Icons.group_outlined,
   ];
 
   static const _activeIconsAdvanced = [
@@ -84,12 +88,14 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     Icons.trending_up,
     Icons.account_balance_wallet,
     Icons.savings,
+    Icons.group,
   ];
   static const _activeIconsSimple = [
     Icons.home,
     Icons.receipt_long,
     Icons.trending_up,
     Icons.savings,
+    Icons.group,
   ];
 
   @override

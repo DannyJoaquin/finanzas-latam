@@ -14,8 +14,13 @@ export class InsightsController {
   ) {}
 
   @Get()
-  findActive(@CurrentUser() user: User) {
-    return this.insightsService.findActive(user.id);
+  async findActive(@CurrentUser() user: User) {
+    const insights = await this.insightsService.findActive(user.id);
+    if (insights.length === 0) {
+      await this.insightsGenerator.generateForUser(user.id).catch(() => {/* non-fatal */});
+      return this.insightsService.findActive(user.id);
+    }
+    return insights;
   }
 
   @Get('achievements')

@@ -79,6 +79,22 @@ export class UserNotificationPreferences {
   @Column({ name: 'inapp_motivation', default: true })
   inappMotivation: boolean;
 
+  // ── Shared groups ─────────────────────────────────────────────────────
+
+  /**
+   * Push when a shared expense the user participates in is edited or deleted.
+   * Default true — users want to know when amounts change.
+   */
+  @Column({ name: 'push_shared_expense_changes', default: true })
+  pushSharedExpenseChanges: boolean;
+
+  /**
+   * Days before a debt is considered overdue and a reminder push is sent.
+   * null = disabled. Default 7 days.
+   */
+  @Column({ name: 'debt_reminder_days', type: 'smallint', nullable: true, default: 7 })
+  debtReminderDays: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -168,7 +168,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
           final categorySource = [...filtered];
           if (filter.selectedCategoryId != null) {
             filtered = filtered
-                .where((e) => e.categoryId == filter.selectedCategoryId)
+                .where((e) =>
+                    e.categoryId == filter.selectedCategoryId ||
+                    (e.categoryId == null && e.categoryName == filter.selectedCategoryId))
                 .toList();
           }
 
@@ -409,6 +411,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
                       final iconSize = isSimple ? 62.0 : 52.0;
                       final itemRadius = isSimple ? 24.0 : 22.0;
+                      final itemColor = e.isShared
+                          ? Colors.teal.shade600
+                          : AppColors.expense;
                       return Padding(
                         padding: EdgeInsets.fromLTRB(16, 0, 16, isSimple ? 16 : 14),
                         child: Container(
@@ -429,7 +434,11 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                               borderRadius: BorderRadius.circular(itemRadius),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(itemRadius),
-                                onTap: _busy ? null : () => _showExpenseActionsSheet(context, e),
+                                onTap: _busy
+                                    ? null
+                                    : e.isShared && e.groupId != null
+                                        ? () => context.push(AppRoutes.sharedGroupDetail(e.groupId!))
+                                        : () => _showExpenseActionsSheet(context, e),
                                 child: Padding(
                                   padding: EdgeInsets.symmetric(
                                       horizontal: isSimple ? 20 : 14,
@@ -440,7 +449,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                         width: iconSize,
                                         height: iconSize,
                                         decoration: BoxDecoration(
-                                          color: AppColors.expense.withAlpha(20),
+                                          color: itemColor.withAlpha(20),
                                           borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
                                         ),
                                         alignment: Alignment.center,
@@ -450,7 +459,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                             : Icon(
                                                 materialIconFromString(e.categoryIcon),
                                                 size: isSimple ? 30 : 24,
-                                                color: AppColors.expense,
+                                                color: itemColor,
                                               ),
                                       ),
                                       const SizedBox(width: 12),
@@ -469,7 +478,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}',
+                                              e.isShared
+                                                  ? '${e.groupName ?? 'Compartido'} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}'
+                                                  : '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}',
                                               style: TextStyle(
                                                 fontSize: isSimple ? 14 : 12,
                                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -479,13 +490,26 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        '-${currencyFmt(e.currency).format(e.amount)}',
-                                        style: TextStyle(
-                                          color: AppColors.expense,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: isSimple ? 20 : 18,
-                                        ),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '-${currencyFmt(e.currency).format(e.amount)}',
+                                            style: TextStyle(
+                                              color: itemColor,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: isSimple ? 20 : 18,
+                                            ),
+                                          ),
+                                          if (e.isShared)
+                                            Text(
+                                              'mi parte',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.teal.shade600,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ],
                                   ),

@@ -26,6 +26,7 @@ import { InsightsModule } from './modules/insights/insights.module';
 import { RulesModule } from './modules/rules/rules.module';
 import { CreditCardsModule } from './modules/credit-cards/credit-cards.module';
 import { CategorizationModule } from './modules/categorization/categorization.module';
+import { SharedGroupsModule } from './modules/shared-groups/shared-groups.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 
 // Jobs
@@ -33,6 +34,8 @@ import { InsightsGeneratorJob } from './jobs/insights-generator.job';
 import { BudgetAlertsJob } from './jobs/budget-alerts.job';
 import { DailyReminderJob } from './jobs/daily-reminder.job';
 import { WeeklySummaryJob } from './jobs/weekly-summary.job';
+import { SharedRecurringJob } from './jobs/shared-recurring.job';
+import { DebtReminderJob } from './jobs/debt-reminder.job';
 
 // Common services
 import { PushNotificationService } from './common/services/push-notification.service';
@@ -43,6 +46,12 @@ import { User } from './modules/users/user.entity';
 import { Budget } from './modules/budgets/budget.entity';
 import { Expense } from './modules/expenses/expense.entity';
 import { Insight } from './modules/insights/insight.entity';
+import { SharedExpense } from './modules/shared-groups/entities/shared-expense.entity';
+import { SharedExpenseParticipant } from './modules/shared-groups/entities/shared-expense-participant.entity';
+import { SharedGroupMember } from './modules/shared-groups/entities/shared-group-member.entity';
+import { SharedGroup } from './modules/shared-groups/entities/shared-group.entity';
+import { SharedSettlement } from './modules/shared-groups/entities/shared-settlement.entity';
+import { UserNotificationPreferences } from './modules/users/user-notification-preferences.entity';
 
 @Module({
   imports: [
@@ -88,7 +97,11 @@ import { Insight } from './modules/insights/insight.entity';
     ScheduleModule.forRoot(),
 
     // ── Feature modules ───────────────────────────────────────────────────
-    TypeOrmModule.forFeature([User, Budget, Expense, Insight]),
+    TypeOrmModule.forFeature([
+      User, Budget, Expense, Insight,
+      SharedExpense, SharedExpenseParticipant, SharedGroupMember,
+      SharedGroup, SharedSettlement, UserNotificationPreferences,
+    ]),
     AuthModule,
     UsersModule,
     CategoriesModule,
@@ -102,6 +115,7 @@ import { Insight } from './modules/insights/insight.entity';
     RulesModule,
     CreditCardsModule,
     CategorizationModule,
+    SharedGroupsModule,
   ],
   providers: [
     // Global JWT guard — all routes require auth unless @Public()
@@ -113,6 +127,8 @@ import { Insight } from './modules/insights/insight.entity';
     BudgetAlertsJob,
     DailyReminderJob,
     WeeklySummaryJob,
+    SharedRecurringJob,
+    DebtReminderJob,
     // Shared services
     PushNotificationService,
     NotificationRoutingService,

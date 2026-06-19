@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/services/tutorial_service.dart';
+import '../../../auth/providers/auth_provider.dart';
+
 import '../../providers/dashboard_provider.dart';
 import '../../models/dashboard_model.dart';
-import '../../../../../core/router/app_router.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../../cash/providers/cash_provider.dart';
@@ -17,6 +20,52 @@ import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../settings/providers/notification_prefs_provider.dart';
+import '../../../shared/providers/shared_groups_provider.dart';
+import '../../../shared/models/shared_balance_model.dart';
+
+/// Reusable "glow card" decoration shared by the dashboard cards for a
+/// consistent modern look: rounded corners, a soft color-tinted ambient
+/// shadow plus a tight contact shadow, and a subtle hairline border in
+/// both light and dark mode.
+/// [subtle] drops the tinted ambient glow for plain list containers that
+/// carry no semantic color (e.g. "Top gastos"), so the colored glow stays
+/// reserved for cards where the color actually means something (risk,
+/// cash, debt, shared balance) — see ARCHITECTURE_KNOWLEDGE.md notes on
+/// keeping visual emphasis intentional rather than uniform.
+BoxDecoration _glowCardDecoration(
+  BuildContext context, {
+  List<Color>? gradient,
+  Color? glowColor,
+  double radius = 24,
+  bool subtle = false,
+}) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final shadowTint = glowColor ?? theme.colorScheme.primary;
+  return BoxDecoration(
+    color: isDark ? const Color(0xFF141826) : theme.colorScheme.surfaceContainerLow,
+    gradient: gradient != null
+        ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradient)
+        : null,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(
+      color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: shadowTint.withAlpha(subtle ? (isDark ? 16 : 6) : (isDark ? 46 : 16)),
+        blurRadius: subtle ? 22 : 30,
+        offset: Offset(0, subtle ? 8 : 12),
+      ),
+      BoxShadow(
+        color: Colors.black.withAlpha(isDark ? 60 : 8),
+        blurRadius: 12,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  );
+}
 
 class _TopActionButton extends StatelessWidget {
   const _TopActionButton({
@@ -53,11 +102,28 @@ class _TopActionButton extends StatelessWidget {
   }
 }
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final userId = ref.read(authStateProvider).valueOrNull?.user?.id;
+      if (!TutorialService().isOnboardingDone(userId: userId)) {
+        context.go(AppRoutes.onboarding);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashAsync = ref.watch(dashboardProvider);
     final insightsAsync = ref.watch(insightsProvider);
     final isSimple = ref.watch(isSimpleModeProvider); // top-level watch — always subscribed
@@ -133,29 +199,54 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                'Inicio',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 26,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.primary.withAlpha(50),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(4),
                     ),
+                  ),
+                  Text(
+                    'Inicio',
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                '$monthTitle · Resumen general',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 14),
+                child: Text(
+                  '$monthTitle · Resumen general',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        letterSpacing: 0.2,
+                      ),
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               _BalanceCard(dash: dash, isSimple: isSimple),
+              if (!isSimple) ...[const SizedBox(height: 12), _SharedSummaryCard()],
               if (!isSimple) ...[const SizedBox(height: 12), _CashPreviewCard()],
               if (!isSimple && dash.creditCardTotal > 0) ...[
                 const SizedBox(height: 12),
                 _CreditCardDebtCard(amount: dash.creditCardTotal, amountUSD: dash.creditCardTotalUSD, periodStart: dash.periodStart, periodEnd: dash.periodEnd),
               ],
               const SizedBox(height: 16),
-              if (isSimple) const _SimplePrimaryButton() else _QuickActions(),
+              if (isSimple) const _SimplePrimaryButton() else const _QuickActions(),
               const SizedBox(height: 16),
               if (!isSimple) ...[_InsightsSection(), const SizedBox(height: 16)],
               _TopCategories(categories: dash.topCategories, isSimple: isSimple),
@@ -500,7 +591,130 @@ class _InsightListTile extends StatelessWidget {
   }
 }
 
-// �"?�"? Balance card �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+// ── Decorative "ticket stub" motifs ──────────────────────────────────────
+// Signature element for the Home dashboard: the balance reads like a pay
+// stub for la quincena (the pay cycle Hondurans actually think in terms
+// of, not "the month") — a torn, perforated card stamped at the corner.
+
+/// A hand-cut dashed rule faking the perforated tear-line of a paper
+/// ticket. No custom painter needed — just spaced containers.
+class _DashedLine extends StatelessWidget {
+  const _DashedLine({required this.color, this.height = 1.4});
+  final Color color;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dashWidth = 5.0;
+        const dashSpace = 5.0;
+        final count = (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+        return Row(
+          children: List.generate(
+            count < 0 ? 0 : count,
+            (_) => Container(
+              width: dashWidth,
+              height: height,
+              margin: const EdgeInsets.only(right: dashSpace),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1)),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The perforation separating the ticket's "amount" stub from its
+/// "details" stub — a dashed rule with a row of punched-out dots.
+class _PunchDivider extends StatelessWidget {
+  const _PunchDivider({required this.lineColor, required this.dotColor});
+  final Color lineColor;
+  final Color dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 9,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(child: Center(child: _DashedLine(color: lineColor))),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(
+              6,
+              (_) => Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The pay-cycle indicator reimagined as a stamped seal — a rotated
+/// double-ring circle, the way a boarding pass gets stamped at the gate.
+/// Replaces the old pill badge.
+class _CycleStamp extends StatelessWidget {
+  const _CycleStamp({required this.days, required this.color, required this.bg});
+  final int days;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -0.16,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: bg,
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withAlpha(150), width: 1),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$days',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        height: 1,
+                      )),
+                  Text('DÍAS',
+                      style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                        letterSpacing: 1.1,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Balance card ──────────────────────────────────────────────────────────
 class _BalanceCard extends ConsumerWidget {
   const _BalanceCard({required this.dash, required this.isSimple});
   final DashboardModel dash;
@@ -533,128 +747,103 @@ class _BalanceCard extends ConsumerWidget {
     final riskAccent = (!isSimple && dash.riskLevel == 'yellow')
       ? (isDark ? const Color(0xFFFFC94D) : const Color(0xFF9A5600))
         : riskColor;
-    final cardBg = isDark ? const Color(0xFF141826) : theme.colorScheme.surfaceContainerLow;
     final primaryTextColor = isDark ? const Color(0xFFF2F5FB) : theme.colorScheme.onSurface;
     final secondaryTextColor =
       isDark ? const Color(0xFFAEB6C7) : theme.colorScheme.onSurfaceVariant;
     final cycleBadgeBg = isDark ? const Color(0xFF1A4C39) : riskAccent.withAlpha(62);
     final cycleBadgeColor = isDark ? const Color(0xFF89F5B6) : riskAccent;
+    final bgGradient = isDark
+        ? const [Color(0xFF1B2333), Color(0xFF10151F)]
+        : [Colors.white, Color.alphaBlend(theme.colorScheme.primary.withAlpha(12), Colors.white)];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
-        gradient: isDark
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1A2131), Color(0xFF111722)],
-              )
-            : null,
-        borderRadius: BorderRadius.circular(24),
-        border: isDark
-          ? Border.all(color: Colors.white.withAlpha(8), width: 1)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-            ? Colors.black.withAlpha(isSimple ? 86 : 72)
-                : theme.shadowColor.withAlpha(isSimple ? 34 : 24),
-            blurRadius: isSimple ? 34 : 26,
-            offset: Offset(0, isSimple ? 12 : 9),
+    final dividerLine = (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 32 : 20);
+    final dividerDot = (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 24 : 14);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          decoration: _glowCardDecoration(
+            context,
+            gradient: bgGradient,
+            glowColor: riskAccent,
+            radius: 26,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(isSimple ? 24 : 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Padding(
+            padding: EdgeInsets.all(isSimple ? 24 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Balance del período',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: primaryTextColor,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.account_balance_wallet_rounded,
+                        size: 13, color: secondaryTextColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'BALANCE DEL PERÍODO',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        letterSpacing: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
-                if (!isSimple)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: cycleBadgeBg,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.circle, size: 8, color: cycleBadgeColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${dash.daysRemaining}d del ciclo',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: cycleBadgeColor,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              fmt.format(dash.balance),
-              style: (isSimple ? theme.textTheme.displayMedium : theme.textTheme.displaySmall)
-                  ?.copyWith(
-                    fontWeight: isSimple ? FontWeight.w900 : FontWeight.bold,
-                    color: primaryTextColor,
-                  ),
-            ),
-            if (!isSimple) ...[
-              const SizedBox(height: 4),
-              // �"?�"? Prediction / safe-spend row �"?�"?
-              _PredictionRow(
-                dash: dash,
-                riskColor: riskAccent,
-                fmt: fmt,
-                neutralTextColor: secondaryTextColor,
-              ),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(isDark ? 10 : 0),
-              decoration: isDark
-                  ? BoxDecoration(
-                      color: const Color(0x22131A28),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withAlpha(12), width: 1),
-                    )
-                  : null,
-              child: Row(
-                children: [
-                  _StatChip(
-                    label: 'Ingresos',
-                    value: fmt.format(dash.totalIncome),
-                    color: AppColors.income,
-                    isSimple: isSimple,
-                    onTap: () => context.go(AppRoutes.incomes),
-                  ),
-                  const SizedBox(width: 12),
-                  _StatChip(
-                    label: 'Gastos',
-                    value: fmt.format(dash.totalExpenses),
-                    color: AppColors.expense,
-                    isSimple: isSimple,
-                    onTap: () => context.go(AppRoutes.expenses),
+                const SizedBox(height: 14),
+                Text(
+                  fmt.format(dash.balance),
+                  style: (isSimple ? theme.textTheme.displayMedium : theme.textTheme.displaySmall)
+                      ?.copyWith(
+                        fontWeight: isSimple ? FontWeight.w900 : FontWeight.bold,
+                        color: primaryTextColor,
+                        letterSpacing: -0.5,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                ),
+                if (!isSimple) ...[
+                  const SizedBox(height: 4),
+                  // ── Prediction / safe-spend row ──
+                  _PredictionRow(
+                    dash: dash,
+                    riskColor: riskAccent,
+                    fmt: fmt,
+                    neutralTextColor: secondaryTextColor,
                   ),
                 ],
-              ),
+                const SizedBox(height: 18),
+                _PunchDivider(lineColor: dividerLine, dotColor: dividerDot),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _StatChip(
+                      label: 'Ingresos',
+                      value: fmt.format(dash.totalIncome),
+                      color: AppColors.income,
+                      isSimple: isSimple,
+                      onTap: () => context.go(AppRoutes.incomes),
+                    ),
+                    const SizedBox(width: 12),
+                    _StatChip(
+                      label: 'Gastos',
+                      value: fmt.format(dash.totalExpenses),
+                      color: AppColors.expense,
+                      isSimple: isSimple,
+                      onTap: () => context.go(AppRoutes.expenses),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        if (!isSimple)
+          Positioned(
+            top: -10,
+            right: 18,
+            child: _CycleStamp(days: dash.daysRemaining, color: cycleBadgeColor, bg: cycleBadgeBg),
+          ),
+      ],
     );
   }
 }
@@ -750,13 +939,31 @@ class _StatChip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: TextStyle(
-                        fontSize: isSimple ? 13 : 11, color: tone, fontWeight: FontWeight.w600)),
+                Row(
+                  children: [
+                    Icon(
+                      label == 'Ingresos'
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_downward_rounded,
+                      size: 12,
+                      color: tone,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(label.toUpperCase(),
+                        style: TextStyle(
+                            fontSize: isSimple ? 12 : 10,
+                            color: tone,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0)),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(value,
                     style: TextStyle(
-                        fontSize: isSimple ? 17 : 14, color: tone, fontWeight: FontWeight.bold)),
+                        fontSize: isSimple ? 17 : 14,
+                        color: tone,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: const [FontFeature.tabularFigures()])),
               ],
             ),
           ),
@@ -776,36 +983,38 @@ class _CashPreviewCard extends ConsumerWidget {
     final cardBg = isDark ? const Color(0xFF123228) : theme.colorScheme.secondaryContainer;
     final cardBg2 = isDark ? const Color(0xFF0E2C23) : theme.colorScheme.secondaryContainer;
     final textColor = isDark ? const Color(0xFFD2F5E7) : theme.colorScheme.onSecondaryContainer;
+    final bgGradient = isDark
+        ? [cardBg, cardBg2]
+        : [
+            theme.colorScheme.secondaryContainer,
+            Color.alphaBlend(AppColors.secondary.withAlpha(20), theme.colorScheme.secondaryContainer),
+          ];
 
     return GestureDetector(
       onTap: () => context.go(AppRoutes.cash),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: cardBg,
-          gradient: isDark
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [cardBg, cardBg2],
-                )
-              : null,
-          borderRadius: BorderRadius.circular(20),
-          border: isDark ? Border.all(color: Colors.white.withAlpha(8), width: 1) : null,
-          boxShadow: [
-            BoxShadow(
-              color: isDark ? Colors.black.withAlpha(56) : theme.shadowColor.withAlpha(24),
-              blurRadius: 26,
-              offset: const Offset(0, 8),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: _glowCardDecoration(
+          context,
+          gradient: bgGradient,
+          glowColor: AppColors.secondary,
+          radius: 20,
+          subtle: true,
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.account_balance_wallet_outlined,
-              color: textColor,
-              size: 22,
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: textColor.withAlpha(isDark ? 30 : 36),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.account_balance_wallet_rounded,
+                color: textColor,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -918,38 +1127,35 @@ class _CreditCardDebtCard extends ConsumerWidget {
     final accentColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
     final titleColor = isDark ? theme.colorScheme.onSurface : const Color(0xFFA45700);
     final bodyColor = isDark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF8C4A00);
-    final bgColor = isDark
-      ? const Color(0xFF171C29)
-        : const Color(0xFFFFF4E5);
+    final bgGradient = isDark
+        ? const [Color(0xFF1C2231), Color(0xFF131925)]
+        : [
+            const Color(0xFFFFF4E5),
+            Color.alphaBlend(accentColor.withAlpha(16), const Color(0xFFFFF4E5)),
+          ];
 
     return GestureDetector(
       onTap: () => _showCreditDetail(context, periodStart, periodEnd, amount, amountUSD),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: bgColor,
-          gradient: isDark
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF1C2231), Color(0xFF131925)],
-                )
-              : null,
-          borderRadius: BorderRadius.circular(20),
-          border: isDark ? Border.all(color: Colors.white.withAlpha(12), width: 1) : null,
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withAlpha(42)
-                  : Theme.of(context).shadowColor.withAlpha(24),
-              blurRadius: 26,
-              offset: const Offset(0, 8),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: _glowCardDecoration(
+          context,
+          gradient: bgGradient,
+          glowColor: accentColor,
+          radius: 20,
+          subtle: true,
         ),
         child: Row(
           children: [
-            Icon(Icons.credit_card_outlined, color: accentColor, size: 22),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accentColor.withAlpha(isDark ? 30 : 34),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.credit_card_rounded, color: accentColor, size: 20),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1253,33 +1459,37 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final creditAccent = isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
     return Row(
       children: [
         _ActionButton(
-          icon: Icons.add_circle_outline,
+          icon: Icons.add_circle_rounded,
           label: 'Gasto',
+          color: AppColors.expense,
           onTap: () => context.go(AppRoutes.addExpense),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         _ActionButton(
-          icon: Icons.account_balance_wallet_outlined,
+          icon: Icons.account_balance_wallet_rounded,
           label: 'Efectivo',
+          color: AppColors.secondary,
           onTap: () => context.go(AppRoutes.cash),
         ),
-        ...[
-          const SizedBox(width: 8),
-          _ActionButton(
-            icon: Icons.bar_chart_outlined,
-            label: 'Análisis',
-            onTap: () => context.go(AppRoutes.analytics),
-          ),
-          const SizedBox(width: 8),
-          _ActionButton(
-            icon: Icons.credit_card_outlined,
-            label: 'Tarjetas',
-            onTap: () => context.go(AppRoutes.creditCards),
-          ),
-        ],
+        const SizedBox(width: 10),
+        _ActionButton(
+          icon: Icons.bar_chart_rounded,
+          label: 'Análisis',
+          color: Theme.of(context).colorScheme.primary,
+          onTap: () => context.go(AppRoutes.analytics),
+        ),
+        const SizedBox(width: 10),
+        _ActionButton(
+          icon: Icons.credit_card_rounded,
+          label: 'Tarjetas',
+          color: creditAccent,
+          onTap: () => context.go(AppRoutes.creditCards),
+        ),
       ],
     );
   }
@@ -1287,37 +1497,42 @@ class _QuickActions extends StatelessWidget {
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton(
-      {required this.icon, required this.label, required this.onTap});
+      {required this.icon, required this.label, required this.onTap, required this.color});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Column(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
+                color: color.withAlpha(isDark ? 28 : 18),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: color.withAlpha(isDark ? 50 : 30), width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).shadowColor.withAlpha(20),
-                    blurRadius: 20,
-                    offset: const Offset(0, 7),
+                    color: color.withAlpha(isDark ? 40 : 22),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             Text(label,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -1529,18 +1744,8 @@ class _TopCategories extends ConsumerWidget {
     final fmt = ref.watch(currencyFmtProvider);
 
     return Container(
-      padding: EdgeInsets.fromLTRB(14, 14, 14, isSimple ? 12 : 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withAlpha(isSimple ? 34 : 20),
-            blurRadius: isSimple ? 28 : 22,
-            offset: Offset(0, isSimple ? 10 : 7),
-          ),
-        ],
-      ),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, isSimple ? 14 : 8),
+      decoration: _glowCardDecoration(context, radius: 20, subtle: true),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1588,15 +1793,16 @@ class _TopCategories extends ConsumerWidget {
                         ),
                         SizedBox(height: isSimple ? 8 : 4),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(isSimple ? 6 : 4),
+                          borderRadius: BorderRadius.circular(isSimple ? 8 : 6),
                           child: LinearProgressIndicator(
                             value: pct,
-                            minHeight: isSimple ? 7 : 5,
+                            minHeight: isSimple ? 9 : 7,
                             color: AppColors.categoryPalette[
                                 e.key % AppColors.categoryPalette.length],
                             backgroundColor: Theme.of(context)
                                 .colorScheme
-                                .surfaceContainerHighest,
+                                .surfaceContainerHighest
+                                .withAlpha(140),
                           ),
                         ),
                       ],
@@ -1623,18 +1829,8 @@ class _RecentExpenses extends ConsumerWidget {
     final fmt = ref.watch(currencyFmtProvider);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withAlpha(20),
-            blurRadius: 22,
-            offset: const Offset(0, 7),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      decoration: _glowCardDecoration(context, radius: 20, subtle: true),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1675,3 +1871,135 @@ class _RecentExpenses extends ConsumerWidget {
   }
 }
 
+// ── Shared Groups Summary Card ───────────────────────────────────────────────
+
+class _SharedSummaryCard extends ConsumerWidget {
+  const _SharedSummaryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(sharedWidgetSummaryProvider);
+    final fmt = ref.watch(currencyFmtProvider);
+    final theme = Theme.of(context);
+
+    return summaryAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (summary) {
+        if (!summary.hasGroups) return const SizedBox.shrink();
+
+        final isDark = theme.brightness == Brightness.dark;
+        final oweColor = isDark ? const Color(0xFF6FE3A0) : Colors.green.shade700;
+        final dueColor = isDark ? const Color(0xFFFFB37A) : Colors.orange.shade700;
+
+        return GestureDetector(
+          onTap: () => context.go(AppRoutes.shared),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _glowCardDecoration(
+              context,
+              glowColor: theme.colorScheme.primary,
+              radius: 20,
+              subtle: true,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withAlpha(isDark ? 30 : 24),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.group_rounded,
+                          color: theme.colorScheme.primary, size: 17),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Gastos Compartidos',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Ver →',
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryChip(
+                        label: 'Te deben',
+                        amount: fmt.format(summary.totalOwed),
+                        color: oweColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _SummaryChip(
+                        label: 'Debes',
+                        amount: fmt.format(summary.totalDue),
+                        color: dueColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.label,
+    required this.amount,
+    required this.color,
+  });
+  final String label;
+  final String amount;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(60)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: color),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

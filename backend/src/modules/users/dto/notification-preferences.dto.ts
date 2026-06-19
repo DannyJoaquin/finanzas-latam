@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdateNotificationPreferencesDto {
   @IsOptional() @IsBoolean() pushBudgetAlerts?: boolean;
@@ -14,4 +14,10 @@ export class UpdateNotificationPreferencesDto {
   @IsOptional() @IsBoolean() inappSavingsOpportunities?: boolean;
   @IsOptional() @IsBoolean() inappPatterns?: boolean;
   @IsOptional() @IsBoolean() inappMotivation?: boolean;
+
+  // Shared groups
+  @IsOptional() @IsBoolean() pushSharedExpenseChanges?: boolean;
+
+  /** null = disable debt reminders; 1–365 = days threshold */
+  @IsOptional() @IsInt() @Min(1) @Max(365) debtReminderDays?: number | null;
 }

@@ -15,6 +15,8 @@ export interface PushPayload {
   body: string;
   /** Optional string-only data map forwarded to the device */
   data?: Record<string, string>;
+  /** When true, bypasses the daily push cap — use for high-priority alerts (e.g. shared expenses) */
+  skipDailyCap?: boolean;
 }
 
 @Injectable()
@@ -74,25 +76,28 @@ export class PushNotificationService {
    * Returns `true` if the message was dispatched, `false` otherwise.
    */
   async send(payload: PushPayload): Promise<boolean> {
-    const { userId, fcmToken, title, body, data } = payload;
+    const { userId, fcmToken, title, body, data, skipDailyCap } = payload;
 
     // ── Daily rate-limit check ───────────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const key = `push:daily:${userId}:${today}`;
 
-    const count = await this.redis.incr(key);
-    if (count === 1) {
-      // First increment today — set TTL so the key auto-expires
-      await this.redis.expire(key, REDIS_TTL_SECONDS);
-    }
+    let count = 0;
+    if (!skipDailyCap) {
+      count = await this.redis.incr(key);
+      if (count === 1) {
+        // First increment today — set TTL so the key auto-expires
+        await this.redis.expire(key, REDIS_TTL_SECONDS);
+      }
 
-    if (count > MAX_DAILY_PUSH) {
-      this.logger.debug(
-        `Daily push cap (${MAX_DAILY_PUSH}) reached for user ${userId} — skipping: "${title}"`,
-      );
-      // Decrement so we don't inflate the counter for messages that weren't sent
-      await this.redis.decr(key);
-      return false;
+      if (count > MAX_DAILY_PUSH) {
+        this.logger.debug(
+          `Daily push cap (${MAX_DAILY_PUSH}) reached for user ${userId} — skipping: "${title}"`,
+        );
+        // Decrement so we don't inflate the counter for messages that weren't sent
+        await this.redis.decr(key);
+        return false;
+      }
     }
 
     // ── Send via FCM ─────────────────────────────────────────────────────
@@ -110,7 +115,8 @@ export class PushNotificationService {
         android: { priority: 'high' as const },
         apns: { payload: { aps: { sound: 'default', badge: 1 } } },
       });
-      this.logger.log(`Push sent [${count}/${MAX_DAILY_PUSH} today] to user ${userId}: "${title}"`);
+      const label = skipDailyCap ? 'uncapped' : `${count}/${MAX_DAILY_PUSH} today`;
+      this.logger.log(`Push sent [${label}] to user ${userId}: "${title}"`);
       return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -154,7 +154,8 @@ export class AnalyticsService {
     const safeDailySpend = daysRemaining > 0 ? available / daysRemaining : 0;
 
     // Risk level: green < 70% spent, yellow 70–90%, red > 90%
-    const spentRatio = totalIncome > 0 ? totalSpent / totalIncome : 1;
+    // If no income AND no expenses, user is new — treat as green (not red)
+    const spentRatio = totalIncome > 0 ? totalSpent / totalIncome : (totalSpent > 0 ? 1 : 0);
     const riskLevel: 'green' | 'yellow' | 'red' =
       spentRatio < 0.7 ? 'green' : spentRatio < 0.9 ? 'yellow' : 'red';
 

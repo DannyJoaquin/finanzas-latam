@@ -55,4 +55,26 @@ class ApiConstants {
 
   // Notification Preferences
   static const String notificationPreferences = '/users/me/notification-preferences';
+
+  // Shared Groups
+  static const String sharedGroups = '/shared-groups';
+  static const String sharedGroupsJoin = '/shared-groups/join';
+  static const String sharedGroupsWidgetSummary = '/shared-groups/widget-summary';
+  static const String mySharedExpenses = '/shared-groups/my-shared-expenses';
+  static String sharedGroupDetail(String id) => '/shared-groups/$id';
+  static String sharedGroupLeave(String id) => '/shared-groups/$id/leave';
+  static String sharedGroupMembers(String id) => '/shared-groups/$id/members';
+  static String sharedGroupBalances(String id) => '/shared-groups/$id/balances';
+  static String sharedGroupExpenses(String id) => '/shared-groups/$id/expenses';
+  static String sharedGroupExpense(String groupId, String expenseId) =>
+      '/shared-groups/$groupId/expenses/$expenseId';
+  static String sharedGroupExpenseApprove(String groupId, String expenseId) =>
+      '/shared-groups/$groupId/expenses/$expenseId/approve';
+  static String sharedGroupExpenseReject(String groupId, String expenseId) =>
+      '/shared-groups/$groupId/expenses/$expenseId/reject';
+  static String sharedGroupSettlements(String id) => '/shared-groups/$id/settlements';
+  static String sharedGroupStats(String id) => '/shared-groups/$id/stats';
+  static String sharedGroupExportCsv(String id) => '/shared-groups/$id/export/csv';
+  static String sharedGroupImport(String id) => '/shared-groups/$id/import';
+  static String sharedGroupSettings(String id) => '/shared-groups/$id/settings';
 }

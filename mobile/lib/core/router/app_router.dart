@@ -24,6 +24,9 @@ import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/rules/presentation/screens/rules_screen.dart';
 import '../../features/achievements/presentation/screens/achievements_screen.dart';
 import '../../features/settings/presentation/screens/loan_calculator_screen.dart';
+import '../../features/shared/presentation/screens/shared_groups_screen.dart';
+import '../../features/shared/presentation/screens/shared_group_detail_screen.dart';
+import '../../features/shared/presentation/screens/add_shared_expense_screen.dart';
 import '../presentation/screens/splash_screen.dart';
 import '../presentation/screens/app_shell.dart';
 
@@ -52,6 +55,9 @@ class AppRoutes {
   static const cash = '/cash';
   static const creditCards = '/credit-cards';
   static const loanCalculator = '/loan-calculator';
+  static const shared = '/shared';
+  static String sharedGroupDetail(String id) => '/shared/$id';
+  static String sharedAddExpense(String id) => '/shared/$id/add-expense';
 }
 
 // A ChangeNotifier that GoRouter uses as refreshListenable.
@@ -80,6 +86,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (authAsync.isLoading) return null;
 
       final isLoggedIn = authAsync.valueOrNull?.isAuthenticated ?? false;
+      final userId = authAsync.valueOrNull?.user?.id;
       final isAuthRoute = state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register ||
           state.matchedLocation == AppRoutes.pinSetup;
@@ -89,12 +96,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (isSplash) return null; // Let splash decide
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
       if (isLoggedIn && isAuthRoute) {
-        // Show onboarding first if not done
-        if (!hasCompletedOnboarding()) return AppRoutes.onboarding;
+        // Show onboarding first if this user hasn't completed it before
+        if (!hasCompletedOnboarding(userId: userId)) return AppRoutes.onboarding;
         return AppRoutes.home;
       }
       // Redirect authenticated user to onboarding if not completed
-      if (isLoggedIn && !isOnboarding && !hasCompletedOnboarding()) {
+      if (isLoggedIn && !isOnboarding && !hasCompletedOnboarding(userId: userId)) {
         return AppRoutes.onboarding;
       }
       return null;
@@ -158,6 +165,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
           GoRoute(path: AppRoutes.creditCards, builder: (c, s) => const CreditCardsScreen()),
           GoRoute(path: AppRoutes.loanCalculator, builder: (c, s) => const LoanCalculatorScreen()),
+          GoRoute(
+            path: AppRoutes.shared,
+            builder: (c, s) => const SharedGroupsScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (c, s) => SharedGroupDetailScreen(groupId: s.pathParameters['id']!),
+                routes: [
+                  GoRoute(
+                    path: 'add-expense',
+                    builder: (c, s) => AddSharedExpenseScreen(groupId: s.pathParameters['id']!),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ],

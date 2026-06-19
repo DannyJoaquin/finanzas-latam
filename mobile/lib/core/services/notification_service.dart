@@ -2,8 +2,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
-import '../../../features/credit_cards/models/credit_card_model.dart';
-import '../../../features/settings/providers/notification_prefs_provider.dart'
+import '../../features/credit_cards/models/credit_card_model.dart';
+import '../../features/settings/providers/notification_prefs_provider.dart'
     show NotificationPreferencesModel;
 
 class NotificationService {

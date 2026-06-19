@@ -40,12 +40,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
         );
+    if (!mounted) return; // Router already navigated
     final state = ref.read(authStateProvider);
-    if (state.hasError && mounted) {
+    if (state.hasError) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.error.toString())),
+        SnackBar(content: Text(_friendlyError(state.error))),
       );
+    } else if (state.value?.isAuthenticated == true) {
+      // Explicit fallback: ensure onboarding always shows for new accounts
+      // (handles timing edge-case where GoRouter redirect fires after this frame)
+      context.go(AppRoutes.onboarding);
     }
+  }
+
+  String _friendlyError(Object? err) {
+    if (err == null) return 'Error desconocido';
+    final msg = err.toString().toLowerCase();
+    if (msg.contains('409') || msg.contains('already') || msg.contains('conflict')) {
+      return 'Este correo ya está registrado. Iniciá sesión o usá otro correo.';
+    }
+    if (msg.contains('network') || msg.contains('connection') || msg.contains('socketexception')) {
+      return 'Sin conexión. Verificá tu internet.';
+    }
+    if (msg.contains('400')) {
+      return 'Datos inválidos. Revisá los campos.';
+    }
+    return 'Error al crear la cuenta. Intentá nuevamente.';
   }
 
   @override

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/dio_client.dart';
-import '../../../../core/constants/api_constants.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/constants/api_constants.dart';
 
 // Maps Material icon name strings (from backend) to IconData
 IconData materialIconFromString(String name) {
@@ -69,6 +69,9 @@ class ExpenseModel {
     required this.categoryName,
     required this.categoryIcon,
     required this.paymentMethod,
+    this.isShared = false,
+    this.groupId,
+    this.groupName,
   });
 
   final String id;
@@ -80,6 +83,9 @@ class ExpenseModel {
   final String categoryName;
   final String categoryIcon;
   final String paymentMethod;
+  final bool isShared;
+  final String? groupId;
+  final String? groupName;
 
   factory ExpenseModel.fromJson(Map<String, dynamic> j) {
     final cat = j['category'] as Map<String, dynamic>?;
@@ -95,14 +101,47 @@ class ExpenseModel {
       paymentMethod: j['paymentMethod'] as String? ?? 'cash',
     );
   }
+
+  factory ExpenseModel.fromSharedJson(Map<String, dynamic> j) {
+    return ExpenseModel(
+      id: j['id'] as String,
+      amount: double.parse((j['amount'] ?? 0).toString()),
+      currency: j['currency'] as String? ?? 'HNL',
+      description: j['description'] as String? ?? '',
+      date: (j['date'] as String).substring(0, 10),
+      categoryId: null,
+      categoryName: 'Gastos Compartidos',
+      categoryIcon: 'group',
+      paymentMethod: 'shared',
+      isShared: true,
+      groupId: j['groupId'] as String?,
+      groupName: j['groupName'] as String?,
+    );
+  }
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 final expensesProvider = FutureProvider.autoDispose<List<ExpenseModel>>((ref) async {
   final dio = ref.watch(dioProvider);
-  final resp = await dio.get(ApiConstants.expenses, queryParameters: {'limit': 50});
-  final items = resp.data['items'] as List<dynamic>? ?? [];
-  return items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+
+  final personalResp = await dio.get(ApiConstants.expenses, queryParameters: {'limit': 50});
+  final items = personalResp.data['items'] as List<dynamic>? ?? [];
+  final personal = items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+
+  List<ExpenseModel> shared = [];
+  try {
+    final sharedResp = await dio.get(ApiConstants.mySharedExpenses);
+    final sharedItems = sharedResp.data as List<dynamic>? ?? [];
+    shared = sharedItems
+        .map((e) => ExpenseModel.fromSharedJson(e as Map<String, dynamic>))
+        .toList();
+  } catch (_) {
+    // Shared expenses are additive — failure is non-fatal
+  }
+
+  final merged = [...personal, ...shared];
+  merged.sort((a, b) => b.date.compareTo(a.date));
+  return merged;
 });
 
 // ── Category provider (for the add expense form) ─────────────────────────────

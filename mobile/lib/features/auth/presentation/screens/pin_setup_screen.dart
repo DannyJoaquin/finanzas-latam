@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
+import '../../../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../providers/auth_provider.dart';
 
 class PinSetupScreen extends ConsumerStatefulWidget {
   const PinSetupScreen({super.key});
@@ -40,7 +42,14 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
       if (_pin.join() == _firstPin!.join()) {
         final storage = ref.read(secureStorageProvider);
         await storage.write(key: StorageKeys.pinCode, value: _pin.join());
-        if (mounted) context.go(AppRoutes.home);
+        if (mounted) {
+          final userId = ref.read(authStateProvider).valueOrNull?.user?.id;
+          if (!hasCompletedOnboarding(userId: userId)) {
+            context.go(AppRoutes.onboarding);
+          } else {
+            context.go(AppRoutes.home);
+          }
+        }
       } else {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Los PINs no coinciden. Intenta nuevamente.')));

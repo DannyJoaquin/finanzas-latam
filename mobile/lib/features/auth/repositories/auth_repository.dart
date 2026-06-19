@@ -51,6 +51,8 @@ class AuthRepository {
     final meResp = await _dio.get(ApiConstants.me);
     final user = UserModel.fromJson(meResp.data as Map<String, dynamic>);
     await _tokens.saveUser(user.toJson());
+    // Onboarding is tracked per-user-id (TutorialService), so a brand-new
+    // account naturally has no flag yet — nothing to reset here.
     return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
   }
 
@@ -62,6 +64,8 @@ class AuthRepository {
       } catch (_) {}
     }
     await _tokens.clearTokens();
+    // Note: onboarding completion is tracked per-user-id and is intentionally
+    // NOT reset here — a returning user should never see onboarding again.
     // Sign out from Google if the user logged in via Google
     try {
       await GoogleAuthService().signOut();

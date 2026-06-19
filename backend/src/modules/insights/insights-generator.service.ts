@@ -124,7 +124,7 @@ export class InsightsGeneratorService {
         type: InsightType.ANOMALY,
         priority: anomaly.severity === 'high' ? InsightPriority.HIGH : InsightPriority.MEDIUM,
         title: `Gasto inusual en ${anomaly.categoryName}`,
-        body: `Esta semana gastaste ${multiplier}x mÃ¡s de lo normal en ${anomaly.categoryName}. ` +
+        body: `Esta semana gastaste ${multiplier}x más de lo normal en ${anomaly.categoryName}. ` +
           `Promedio semanal: L ${anomaly.avgWeeklyTotal.toFixed(0)}, esta semana: L ${anomaly.currentWeekTotal.toFixed(0)}.`,
         metadata: {
           categoryId: anomaly.categoryId,
@@ -162,8 +162,8 @@ export class InsightsGeneratorService {
       userId,
       type: InsightType.PROJECTION,
       priority: InsightPriority.CRITICAL,
-      title: 'Tu dinero podrÃ­a no alcanzar hasta la quincena',
-      body: `A tu ritmo actual de gastos, podrÃ­as quedarte sin fondos antes del final del perÃ­odo. ` +
+      title: 'Tu dinero podría no alcanzar hasta la quincena',
+      body: `A tu ritmo actual de gastos, podrías quedarte sin fondos antes del final del período. ` +
         `Gasto diario seguro: L ${dashboard.safeDailySpend.toFixed(0)}. ` +
         (dashboard.cashRunoutDate
           ? `Estimado de quiebre: ${dashboard.cashRunoutDate}.`
@@ -291,17 +291,17 @@ export class InsightsGeneratorService {
 
     if (avg === 0 || topTotal < avg * 1.3) return;
 
-    const dayNames = ['domingos', 'lunes', 'martes', 'miÃ©rcoles', 'jueves', 'viernes', 'sÃ¡bados'];
-    const dayName = dayNames[parseInt(top.dow)] ?? 'ese dÃ­a';
+    const dayNames = ['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'];
+    const dayName = dayNames[parseInt(top.dow)] ?? 'ese día';
     const multiplier = Math.round((topTotal / avg) * 10) / 10;
 
     const insight = this.insightRepo.create({
       userId,
       type: InsightType.PATTERN,
       priority: InsightPriority.LOW,
-      title: `Gastas mÃ¡s los ${dayName}`,
+      title: `Gastas más los ${dayName}`,
       body: `Tus gastos los ${dayName} son ${multiplier}x tu promedio semanal. ` +
-        `Considera planificar con anticipaciÃ³n ese dÃ­a.`,
+        `Considera planificar con anticipación ese día.`,
       metadata: { dow: parseInt(top.dow), dayName, multiplier, avgTotal: Math.round(avg) },
       expiresAt: this.expiresInDays(7),
     });
@@ -332,9 +332,9 @@ export class InsightsGeneratorService {
       type: InsightType.SAVINGS_OPPORTUNITY,
       priority: InsightPriority.MEDIUM,
       title: `${top.categoryName} consume el ${pctDisplay}% de tus ingresos`,
-      body: `Reducir un 20% en ${top.categoryName} te ahorrarÃ­a ` +
-        `L ${simulation.projectedSavings.toFixed(0)}/mes â€” ` +
-        `L ${simulation.annualSavings.toFixed(0)} al aÃ±o.`,
+      body: `Reducir un 20% en ${top.categoryName} te ahorraría ` +
+        `L ${simulation.projectedSavings.toFixed(0)}/mes — ` +
+        `L ${simulation.annualSavings.toFixed(0)} al año.`,
       metadata: {
         categoryId: top.categoryId,
         categoryName: top.categoryName,
@@ -366,10 +366,10 @@ export class InsightsGeneratorService {
     if (await this.hasActiveInsight(userId, InsightType.STREAK)) return;
 
     const messages: Record<number, { title: string; body: string }> = {
-      3:  { title: 'Â¡3 dÃ­as seguidos! ðŸŽ¯', body: 'Llevas 3 dÃ­as consecutivos registrando tus gastos. Â¡Sigue asÃ­!' },
-      7:  { title: 'Â¡Una semana completa! ðŸ”¥', body: '7 dÃ­as seguidos registrando gastos. Tu hÃ¡bito financiero se estÃ¡ formando.' },
-      14: { title: 'Â¡Dos semanas de racha! âš¡', body: '14 dÃ­as consecutivos. EstÃ¡s construyendo un excelente control financiero.' },
-      30: { title: 'Â¡Un mes completo! ðŸ†', body: '30 dÃ­as de racha. Eres una persona con disciplina financiera ejemplar.' },
+      3:  { title: '¡3 días seguidos! 🎯', body: 'Llevas 3 días consecutivos registrando tus gastos. ¡Sigue así!' },
+      7:  { title: '¡Una semana completa! 🔥', body: '7 días seguidos registrando gastos. Tu hábito financiero se está formando.' },
+      14: { title: '¡Dos semanas de racha! ⚡', body: '14 días consecutivos. Estás construyendo un excelente control financiero.' },
+      30: { title: '¡Un mes completo! 🏆', body: '30 días de racha. Eres una persona con disciplina financiera ejemplar.' },
     };
 
     const msg = messages[milestone] ?? messages[3];
@@ -378,7 +378,7 @@ export class InsightsGeneratorService {
       type: InsightType.STREAK,
       priority: milestone >= 14 ? InsightPriority.HIGH : InsightPriority.MEDIUM,
       title: msg.title,
-      body: `${msg.body} Racha actual: ${streak} dÃ­as.`,
+      body: `${msg.body} Racha actual: ${streak} días.`,
       metadata: { streakDays: streak, milestone },
       expiresAt: this.expiresInDays(3),
     });
@@ -456,8 +456,8 @@ export class InsightsGeneratorService {
       userId,
       type: InsightType.ACHIEVEMENT,
       priority: InsightPriority.LOW,
-      title: 'Â¡Primer gasto registrado! ðŸŽ‰',
-      body: 'Has registrado tu primer gasto. Â¡Bienvenido a un mejor control financiero!',
+      title: '¡Primer gasto registrado! 🎉',
+      body: 'Has registrado tu primer gasto. ¡Bienvenido a un mejor control financiero!',
       metadata: { key },
       expiresAt: this.expiresInDays(7),
     }));
@@ -475,7 +475,7 @@ export class InsightsGeneratorService {
       userId,
       type: InsightType.ACHIEVEMENT,
       priority: InsightPriority.MEDIUM,
-      title: `Â¡Logro: ${label}! ðŸ…`,
+      title: `¡Logro: ${label}! 🏅`,
       body: `Llevas ${count} gastos registrados. Cada registro es un paso hacia mejor salud financiera.`,
       metadata: { key, threshold, actual: count },
       expiresAt: this.expiresInDays(7),
