@@ -1,13 +1,14 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, ILike, MoreThan, Repository } from 'typeorm';
-import { Expense, PaymentMethod } from './expense.entity';
+import { Expense, ExpenseSource, PaymentMethod } from './expense.entity';
 import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/expense.dto';
 import { parsePagination, buildMeta } from '../../common/utils/pagination.util';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CashTransaction, CashTxType } from '../cash/cash-transaction.entity';
 import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
 import { CategorizationLearningService } from '../categorization/categorization-learning.service';
+import { RulesEvaluatorService } from '../rules/rules-evaluator.service';
 
 @Injectable()
 export class ExpensesService {
@@ -20,6 +21,7 @@ export class ExpensesService {
     private cashTxRepo: Repository<CashTransaction>,
     private categorizationService: ExpenseCategorizationService,
     private learningService: CategorizationLearningService,
+    private rulesEvaluatorService: RulesEvaluatorService,
   ) {}
 
   async findAll(userId: string, filters: FilterExpensesDto) {
@@ -56,25 +58,39 @@ export class ExpensesService {
     return expense;
   }
 
-  async create(userId: string, dto: CreateExpenseDto): Promise<Expense> {
+  async create(
+    userId: string,
+    dto: CreateExpenseDto,
+    metadata: {
+      recurringExpenseId?: string;
+      recurringScheduledDate?: string;
+    } = {},
+  ): Promise<Expense> {
     const expenseDate = new Date(dto.date);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     if (expenseDate > tomorrow) {
       throw new BadRequestException('Expense date cannot be in the future');
     }
-    // Duplicate detection: same user + amount + category + date + description within 5 seconds
-    const fiveSecondsAgo = new Date(Date.now() - 5000);
-    const duplicate = await this.expenseRepo.findOne({
-      where: {
-        userId,
-        amount: dto.amount as any,
-        categoryId: dto.categoryId ?? (null as any),
-        description: dto.description ?? '',
-        createdAt: MoreThan(fiveSecondsAgo),
-      },
-    });
-    if (duplicate) throw new ConflictException('Duplicate expense detected: identical expense submitted within 5 seconds');
+    // Manual duplicate protection should not block several overdue occurrences
+    // being generated in one processing pass.
+    if (!metadata.recurringExpenseId) {
+      const fiveSecondsAgo = new Date(Date.now() - 5000);
+      const duplicate = await this.expenseRepo.findOne({
+        where: {
+          userId,
+          amount: dto.amount as any,
+          categoryId: dto.categoryId ?? (null as any),
+          description: dto.description ?? '',
+          createdAt: MoreThan(fiveSecondsAgo),
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          'Duplicate expense detected: identical expense submitted within 5 seconds',
+        );
+      }
+    }
 
     // Auto-categorize if no category provided
     let resolvedCategoryId = dto.categoryId;
@@ -97,6 +113,14 @@ export class ExpensesService {
       categoryId: resolvedCategoryId,
       userId,
       date: expenseDate,
+      ...(metadata.recurringExpenseId
+        ? {
+            isRecurring: true,
+            recurringExpenseId: metadata.recurringExpenseId,
+            recurringScheduledDate: new Date(metadata.recurringScheduledDate!),
+            source: ExpenseSource.AUTO,
+          }
+        : {}),
     });
     let saved: Expense;
     try {
@@ -148,6 +172,12 @@ export class ExpensesService {
       } catch {
         // Cash deduction is best-effort; don't fail the expense creation
       }
+    }
+
+    try {
+      await this.rulesEvaluatorService.evaluateOnExpense(saved);
+    } catch {
+      // Keep expense creation independent from optional automations.
     }
 
     return saved;

@@ -30,5 +30,6 @@ Thumbs.db
 # Firebase & Secrets
 *.env.firebase
 backend/.env*
+client_secret*.json
 mobile/android/app/google-services.json
 mobile/ios/Runner/GoogleService-Info.plist

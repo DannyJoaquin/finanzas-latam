@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -5,6 +6,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import '../../features/credit_cards/models/credit_card_model.dart';
 import '../../features/settings/providers/notification_prefs_provider.dart'
     show NotificationPreferencesModel;
+import 'browser_notification_service.dart';
 
 class NotificationService {
   NotificationService._();
@@ -18,6 +20,8 @@ class NotificationService {
       'Notificaciones de corte y pago de tarjetas de crédito';
 
   Future<void> initialize() async {
+    if (kIsWeb) return;
+
     tz_data.initializeTimeZones();
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -43,6 +47,16 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    if (kIsWeb) {
+      await showBrowserNotification(
+        title: title,
+        body: body,
+        id: id,
+        payload: payload,
+      );
+      return;
+    }
+
     await _plugin.show(
       id,
       title,
@@ -58,6 +72,8 @@ class NotificationService {
     List<CreditCardSummary> cards, [
     NotificationPreferencesModel? prefs,
   ]) async {
+    if (kIsWeb) return;
+
     // Cancel previous credit card notifications (ids 100–599, supports up to 50 cards)
     for (int i = 100; i < 600; i++) {
       await _plugin.cancel(i);
@@ -113,7 +129,8 @@ class NotificationService {
     final now = DateTime.now();
 
     final fiveDaysBefore = payDate.subtract(const Duration(days: 5));
-    if ((prefs == null || prefs.localCardDue5d) && fiveDaysBefore.isAfter(now)) {
+    if ((prefs == null || prefs.localCardDue5d) &&
+        fiveDaysBefore.isAfter(now)) {
       await _plugin.zonedSchedule(
         id,
         '💳 Pago de ${card.name} vence en 5 días',

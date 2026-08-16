@@ -49,9 +49,22 @@ export class CreateBudgetDto {
 
 export class UpdateBudgetDto {
   @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  name?: string;
+
+  @IsOptional()
   @IsNumber()
   @IsPositive()
   amount?: number;
+
+  @IsOptional()
+  @IsEnum(BudgetPeriod)
+  periodType?: BudgetPeriod;
 
   @IsOptional()
   @IsDateString()

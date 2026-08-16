@@ -26,7 +26,15 @@
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 30d
       ENCRYPTION_KEY: dev-32-char-key-change-in-prod!!
-      GOOGLE_CLIENT_ID: 642124641220-oh2b998fll013blsj104l8v0gmrpoko8.apps.googleusercontent.com
+      # Use the OAuth client ID of type Web, not the Android client ID.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-642124641220-ggestl7tmat542ushpdfch80hiiuhck7.apps.googleusercontent.com}
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:8092}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_SECURE: ${MAIL_SECURE:-false}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-Zentri <no-reply@zentri.app>}
       # Paste your Firebase Admin SDK JSON (minified) here to enable push notifications.
       # Get it from: Firebase Console â†’ Project Settings â†’ Service Accounts â†’ Generate new private key
     command: npm run start:dev

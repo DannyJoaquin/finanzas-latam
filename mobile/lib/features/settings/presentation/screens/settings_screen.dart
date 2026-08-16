@@ -7,6 +7,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/constants/currency_format.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 
@@ -38,10 +39,8 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             '$monthTitle · Preferencias de tu cuenta',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
 
@@ -63,9 +62,12 @@ class SettingsScreen extends ConsumerWidget {
                 contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
                 leading: CircleAvatar(
                   radius: 26,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primaryContainer,
                   child: Text(
-                    user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                    user.fullName.isNotEmpty
+                        ? user.fullName[0].toUpperCase()
+                        : '?',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
@@ -73,7 +75,8 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                title: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(user.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(user.email),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit_outlined),
@@ -103,10 +106,27 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _showEditProfileSheet(context, ref, user),
           ),
           ListTile(
-            leading: const Icon(Icons.lock_outlined),
-            title: const Text('Cambiar contraseña'),
+            leading: Icon(
+              user?.hasPassword == true
+                  ? Icons.lock_outlined
+                  : Icons.key_outlined,
+            ),
+            title: Text(
+              user?.hasPassword == true
+                  ? 'Cambiar contraseña'
+                  : 'Establecer contraseña',
+            ),
+            subtitle: Text(
+              user?.hasPassword == true
+                  ? 'Actualiza tu contraseña de acceso'
+                  : 'Activa el acceso con correo y contraseña',
+            ),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showChangePasswordDialog(context, ref),
+            onTap: () => _showChangePasswordDialog(
+              context,
+              ref,
+              hasExistingPassword: user?.hasPassword ?? true,
+            ),
           ),
           const Divider(),
 
@@ -119,7 +139,7 @@ class SettingsScreen extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  user?.currency ?? 'HNL',
+                  currencySymbol(user?.currency ?? 'HNL'),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -129,7 +149,8 @@ class SettingsScreen extends ConsumerWidget {
                 const Icon(Icons.chevron_right),
               ],
             ),
-            onTap: () => _showCurrencyPicker(context, ref, user?.currency ?? 'HNL'),
+            onTap: () =>
+                _showCurrencyPicker(context, ref, user?.currency ?? 'HNL'),
           ),
           ListTile(
             leading: const Icon(Icons.category_outlined),
@@ -142,7 +163,8 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.calendar_today_outlined),
               title: const Text('Ciclo de pago'),
-              subtitle: const Text('Define los límites del período mostrado en Inicio'),
+              subtitle: const Text(
+                  'Define los límites del período mostrado en Inicio'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -157,13 +179,15 @@ class SettingsScreen extends ConsumerWidget {
                   const Icon(Icons.chevron_right),
                 ],
               ),
-              onTap: () => _showCyclePicker(context, ref, user?.payCycle ?? 'monthly'),
+              onTap: () =>
+                  _showCyclePicker(context, ref, user?.payCycle ?? 'monthly'),
             ),
           if (!isSimple && user?.payCycle == 'biweekly')
             ListTile(
               leading: const Icon(Icons.event_outlined),
               title: const Text('Días de corte'),
-              subtitle: const Text('Determinan cuándo inicia y termina cada quincena'),
+              subtitle: const Text(
+                  'Determinan cuándo inicia y termina cada quincena'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -179,7 +203,7 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
               onTap: () => _showPayDayPicker(
-                context, ref, user?.payDay1 ?? 15, user?.payDay2 ?? 30),
+                  context, ref, user?.payDay1 ?? 15, user?.payDay2 ?? 30),
             ),
           const Divider(),
 
@@ -202,38 +226,39 @@ class SettingsScreen extends ConsumerWidget {
           // Tools
           if (!isSimple) ...[
             const _SectionHeader(title: 'Herramientas'),
-          ListTile(
-            leading: const Icon(Icons.calculate_outlined),
-            title: const Text('Simulador de ahorro'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go(AppRoutes.simulator),
-          ),
-          ListTile(
-            leading: const Icon(Icons.rule_outlined),
-            title: const Text('Reglas automáticas'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go(AppRoutes.rules),
-          ),
-          ListTile(
-            leading: const Icon(Icons.emoji_events_outlined),
-            title: const Text('Logros y medallas'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go(AppRoutes.achievements),
-          ),
-          ListTile(
-            leading: const Icon(Icons.request_quote_outlined),
-            title: const Text('Calculadora de préstamos'),
-            subtitle: const Text('Cuota y tabla de amortización'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go(AppRoutes.loanCalculator),
-          ),
-          const Divider(),
+            ListTile(
+              leading: const Icon(Icons.calculate_outlined),
+              title: const Text('Simulador de ahorro'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go(AppRoutes.simulator),
+            ),
+            ListTile(
+              leading: const Icon(Icons.rule_outlined),
+              title: const Text('Reglas automáticas'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go(AppRoutes.rules),
+            ),
+            ListTile(
+              leading: const Icon(Icons.emoji_events_outlined),
+              title: const Text('Logros y medallas'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go(AppRoutes.achievements),
+            ),
+            ListTile(
+              leading: const Icon(Icons.request_quote_outlined),
+              title: const Text('Calculadora de préstamos'),
+              subtitle: const Text('Cuota y tabla de amortización'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go(AppRoutes.loanCalculator),
+            ),
+            const Divider(),
           ], // end if (!isSimple)
 
           // Danger zone
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
+            title: const Text('Cerrar sesión',
+                style: TextStyle(color: Colors.red)),
             onTap: () async {
               final confirm = await showDialog<bool>(
                 context: context,
@@ -241,10 +266,13 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('Cerrar sesión'),
                   content: const Text('¿Seguro que deseas cerrar sesión?'),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(c, false),
+                        child: const Text('Cancelar')),
                     TextButton(
                       onPressed: () => Navigator.pop(c, true),
-                      child: const Text('Salir', style: TextStyle(color: Colors.red)),
+                      child: const Text('Salir',
+                          style: TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -275,7 +303,8 @@ class SettingsScreen extends ConsumerWidget {
         _ => 'Mensual',
       };
 
-  void _showEditProfileSheet(BuildContext context, WidgetRef ref, dynamic user) {
+  void _showEditProfileSheet(
+      BuildContext context, WidgetRef ref, dynamic user) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -286,7 +315,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showCurrencyPicker(BuildContext context, WidgetRef ref, String current) {
+  void _showCurrencyPicker(
+      BuildContext context, WidgetRef ref, String current) {
     const currencies = ['HNL', 'USD', 'GTQ', 'MXN', 'CRC', 'NIO'];
     const labels = {
       'HNL': 'Lempira hondureño',
@@ -322,8 +352,12 @@ class SettingsScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   Icon(
-                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -334,12 +368,15 @@ class SettingsScreen extends ConsumerWidget {
                         c,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
                         ),
                       ),
                       Text(
                         labels[c] ?? c,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -390,8 +427,12 @@ class SettingsScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   Icon(
-                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -402,12 +443,15 @@ class SettingsScreen extends ConsumerWidget {
                         cycleLabels[c] ?? c,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
                         ),
                       ),
                       Text(
                         cycleDescriptions[c] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -420,7 +464,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showPayDayPicker(BuildContext context, WidgetRef ref, int currentDay1, int currentDay2) {
+  void _showPayDayPicker(
+      BuildContext context, WidgetRef ref, int currentDay1, int currentDay2) {
     // Common LATAM quincena configurations: [payDay1, payDay2]
     const options = [
       [15, 30],
@@ -428,7 +473,8 @@ class SettingsScreen extends ConsumerWidget {
       [10, 25],
       [5, 20],
     ];
-    final optionLabels = options.map((o) => 'Día ${o[0]} y día ${o[1]}').toList();
+    final optionLabels =
+        options.map((o) => 'Día ${o[0]} y día ${o[1]}').toList();
 
     showDialog(
       context: context,
@@ -439,7 +485,9 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
             child: Text(
               'Define en qué días del mes termina cada quincena.',
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 8),
@@ -453,7 +501,8 @@ class SettingsScreen extends ConsumerWidget {
                 if (isSelected) return;
                 try {
                   final dio = ref.read(dioProvider);
-                  await dio.patch(ApiConstants.me, data: {'payDay1': d1, 'payDay2': d2});
+                  await dio.patch(ApiConstants.me,
+                      data: {'payDay1': d1, 'payDay2': d2});
                   ref.invalidate(authStateProvider);
                 } catch (e) {
                   if (context.mounted) {
@@ -467,8 +516,12 @@ class SettingsScreen extends ConsumerWidget {
                 child: Row(
                   children: [
                     Icon(
-                      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                      isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -479,12 +532,15 @@ class SettingsScreen extends ConsumerWidget {
                           optionLabels[e.key],
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? Theme.of(context).colorScheme.primary : null,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
                           ),
                         ),
                         Text(
                           'Períodos: 1–$d1  y  ${d1 + 1}–$d2',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -498,72 +554,194 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
+  void _showChangePasswordDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool hasExistingPassword,
+  }) {
     final currentCtrl = TextEditingController();
     final newCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
+    var obscureCurrent = true;
+    var obscureNew = true;
+    var obscureConfirm = true;
+    var saving = false;
 
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cambiar contraseña'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Contraseña actual'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(
+            hasExistingPassword
+                ? 'Cambiar contraseña'
+                : 'Establecer contraseña',
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  hasExistingPassword
+                      ? 'Confirma tu contraseña actual para continuar.'
+                      : 'Podrás iniciar sesión con Google o con tu correo y esta nueva contraseña.',
+                  style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(dialogContext)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
+                ),
+                if (hasExistingPassword) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: currentCtrl,
+                    obscureText: obscureCurrent,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña actual',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        tooltip: obscureCurrent ? 'Mostrar' : 'Ocultar',
+                        onPressed: () => setDialogState(
+                          () => obscureCurrent = !obscureCurrent,
+                        ),
+                        icon: Icon(
+                          obscureCurrent
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newCtrl,
+                  obscureText: obscureNew,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'Nueva contraseña',
+                    helperText: 'Mínimo 8 caracteres',
+                    prefixIcon: const Icon(Icons.key_outlined),
+                    suffixIcon: IconButton(
+                      tooltip: obscureNew ? 'Mostrar' : 'Ocultar',
+                      onPressed: () => setDialogState(
+                        () => obscureNew = !obscureNew,
+                      ),
+                      icon: Icon(
+                        obscureNew
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: obscureConfirm,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Confirmar contraseña',
+                    prefixIcon: const Icon(Icons.verified_user_outlined),
+                    suffixIcon: IconButton(
+                      tooltip: obscureConfirm ? 'Mostrar' : 'Ocultar',
+                      onPressed: () => setDialogState(
+                        () => obscureConfirm = !obscureConfirm,
+                      ),
+                      icon: Icon(
+                        obscureConfirm
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Nueva contraseña'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirmar contraseña'),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final newPassword = newCtrl.text;
+                      if (hasExistingPassword && currentCtrl.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ingresa tu contraseña actual'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (newPassword.length < 8) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'La contraseña debe tener al menos 8 caracteres'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (newPassword != confirmCtrl.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Las contraseñas no coinciden'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => saving = true);
+                      try {
+                        final dio = ref.read(dioProvider);
+                        await dio.patch(ApiConstants.changePassword, data: {
+                          if (hasExistingPassword)
+                            'currentPassword': currentCtrl.text,
+                          'newPassword': newPassword,
+                        });
+                        ref.invalidate(authStateProvider);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Contraseña actualizada'),
+                            ),
+                          );
+                        }
+                      } catch (error) {
+                        if (dialogContext.mounted) {
+                          setDialogState(() => saving = false);
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('No se pudo actualizar: $error')),
+                          );
+                        }
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Guardar'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              if (newCtrl.text != confirmCtrl.text) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Las contraseñas no coinciden')));
-                }
-                return;
-              }
-              try {
-                final dio = ref.read(dioProvider);
-                await dio.patch(ApiConstants.me, data: {
-                  'currentPassword': currentCtrl.text,
-                  'newPassword': newCtrl.text,
-                });
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contraseña actualizada')));
-                }
-              } catch (e) {
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
-    );
+    ).whenComplete(() {
+      currentCtrl.dispose();
+      newCtrl.dispose();
+      confirmCtrl.dispose();
+    });
   }
 }
 
@@ -633,7 +811,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Editar perfil', style: Theme.of(context).textTheme.titleLarge),
+            Text('Editar perfil',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 20),
             TextFormField(
               controller: _nameCtrl,
@@ -641,7 +820,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 labelText: 'Nombre completo',
                 prefixIcon: Icon(Icons.person_outline),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
             const SizedBox(height: 24),
             FilledButton(
@@ -703,7 +883,9 @@ class _ExperienceModePicker extends ConsumerWidget {
             label: 'Simple',
             description: 'Esencial y sin distracciones',
             selected: current == 'simple',
-            onTap: () => ref.read(experienceModeNotifierProvider.notifier).setMode('simple'),
+            onTap: () => ref
+                .read(experienceModeNotifierProvider.notifier)
+                .setMode('simple'),
             colorScheme: colorScheme,
           ),
           const SizedBox(width: 10),
@@ -712,7 +894,9 @@ class _ExperienceModePicker extends ConsumerWidget {
             label: 'Avanzado',
             description: 'Insights, reglas y más',
             selected: current == 'advanced',
-            onTap: () => ref.read(experienceModeNotifierProvider.notifier).setMode('advanced'),
+            onTap: () => ref
+                .read(experienceModeNotifierProvider.notifier)
+                .setMode('advanced'),
             colorScheme: colorScheme,
           ),
         ],
@@ -747,10 +931,13 @@ class _ModeCard extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected ? colorScheme.primaryContainer : colorScheme.surfaceContainerLow,
+            color: selected
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+              color:
+                  selected ? colorScheme.primary : colorScheme.outlineVariant,
               width: selected ? 2 : 1,
             ),
             boxShadow: [
@@ -766,7 +953,9 @@ class _ModeCard extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
                 size: 24,
               ),
               const SizedBox(height: 8),
@@ -782,7 +971,9 @@ class _ModeCard extends StatelessWidget {
                 description,
                 style: TextStyle(
                   fontSize: 11,
-                  color: selected ? colorScheme.primary.withAlpha(180) : colorScheme.onSurfaceVariant,
+                  color: selected
+                      ? colorScheme.primary.withAlpha(180)
+                      : colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -792,4 +983,3 @@ class _ModeCard extends StatelessWidget {
     );
   }
 }
-

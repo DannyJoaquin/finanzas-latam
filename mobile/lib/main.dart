@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -23,17 +24,50 @@ void main() async {
   await NotificationService.instance.initialize();
 
   // Initialize Firebase if native config is present.
-  await _initializeFirebase();
-  await FcmService.instance.initialize();
+  final firebaseInitialized = await _initializeFirebase();
+  if (firebaseInitialized) {
+    await FcmService.instance.initialize();
+  }
 
   runApp(const ProviderScope(child: FinanzasApp()));
 }
 
-Future<void> _initializeFirebase() async {
+Future<bool> _initializeFirebase() async {
   try {
+    if (kIsWeb) {
+      const apiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
+      const appId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
+      const messagingSenderId =
+          String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID');
+      const projectId = String.fromEnvironment('FIREBASE_WEB_PROJECT_ID');
+
+      if (apiKey.isEmpty ||
+          appId.isEmpty ||
+          messagingSenderId.isEmpty ||
+          projectId.isEmpty) {
+        debugPrint('[FCM] Firebase Web config missing; push disabled');
+        return false;
+      }
+
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: apiKey,
+          appId: appId,
+          messagingSenderId: messagingSenderId,
+          projectId: projectId,
+          authDomain: String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN'),
+          storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+          measurementId: String.fromEnvironment('FIREBASE_WEB_MEASUREMENT_ID'),
+        ),
+      );
+      return true;
+    }
+
     await Firebase.initializeApp();
+    return true;
   } catch (e) {
     debugPrint('[FCM] Firebase init skipped: $e');
+    return false;
   }
 }
 

@@ -99,10 +99,32 @@ export class BudgetsService {
 
   async update(userId: string, id: string, dto: UpdateBudgetDto): Promise<Budget> {
     const budget = await this.findOne(userId, id);
+    const categoryId = dto.categoryId ?? budget.categoryId;
+    const periodType = dto.periodType ?? budget.periodType;
+    const periodStart = dto.periodStart ? new Date(dto.periodStart) : budget.periodStart;
+    const periodEnd = dto.periodEnd ? new Date(dto.periodEnd) : budget.periodEnd;
+
+    const existing = await this.budgetRepo
+      .createQueryBuilder('b')
+      .where('b.userId = :userId', { userId })
+      .andWhere('b.id != :id', { id })
+      .andWhere('b.categoryId = :categoryId', { categoryId: categoryId ?? null })
+      .andWhere('b.periodType = :periodType', { periodType })
+      .andWhere('b.isActive = true')
+      .andWhere('b.periodStart <= :periodEnd', { periodEnd })
+      .andWhere('b.periodEnd >= :periodStart', { periodStart })
+      .getOne();
+
+    if (existing) {
+      throw new BadRequestException(`Ya tienes un presupuesto activo "${existing.name}" para esta categoría en ese período.`);
+    }
+
     const updateData = {
       ...dto,
-      ...(dto.periodStart ? { periodStart: new Date(dto.periodStart) } : {}),
-      ...(dto.periodEnd ? { periodEnd: new Date(dto.periodEnd) } : {}),
+      categoryId,
+      periodType,
+      periodStart,
+      periodEnd,
     };
     Object.assign(budget, updateData);
     return this.budgetRepo.save(budget);

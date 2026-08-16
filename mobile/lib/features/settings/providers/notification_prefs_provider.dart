@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class NotificationPreferencesModel {
   final bool pushBudgetAlerts;
@@ -115,6 +116,10 @@ class NotificationPreferencesNotifier
     extends AsyncNotifier<NotificationPreferencesModel> {
   @override
   Future<NotificationPreferencesModel> build() async {
+    final auth = await ref.watch(authStateProvider.future);
+    if (!auth.isAuthenticated) {
+      throw StateError('Debes iniciar sesión para cargar las preferencias');
+    }
     final dio = ref.watch(dioProvider);
     final resp = await dio.get(ApiConstants.notificationPreferences);
     return NotificationPreferencesModel.fromJson(

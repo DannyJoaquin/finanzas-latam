@@ -1,9 +1,15 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../services/google_auth_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../widgets/google_auth_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -19,20 +25,68 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _agreed = false;
+  StreamSubscription<void>? _googleSignInSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _googleSignInSubscription = GoogleAuthService().onWebSignIn.listen((_) {
+        unawaited(_signInWithGoogle());
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _googleSignInSubscription?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (ref.read(authStateProvider).isLoading) return;
+    await ref.read(authStateProvider.notifier).loginWithGoogle();
+    if (!mounted) return;
+    final authAsync = ref.read(authStateProvider);
+    if (authAsync.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyGoogleError(authAsync.error))),
+      );
+    }
+  }
+
+  String _friendlyGoogleError(Object? err) {
+    if (err == null) return 'Error desconocido';
+    final msg = _googleErrorMessage(err);
+    if (msg.contains('409') || msg.contains('already exists')) {
+      return 'Este correo ya tiene una cuenta. Inicia sesión con tu correo y contraseña.';
+    }
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Sin conexión. Verifica tu internet.';
+    }
+    return 'No pudimos continuar con Google. Inténtalo nuevamente.';
+  }
+
+  String _googleErrorMessage(Object err) {
+    if (err is DioException) {
+      final body = err.response?.data;
+      if (body is Map) {
+        final message = body['message'];
+        if (message is String) return message.toLowerCase();
+        if (message is List) return message.join(' ').toLowerCase();
+      }
+    }
+    return err.toString().toLowerCase();
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreed) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Acepta los términos para continuar')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Acepta los términos para continuar')));
       return;
     }
     await ref.read(authStateProvider.notifier).register(
@@ -56,10 +110,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _friendlyError(Object? err) {
     if (err == null) return 'Error desconocido';
     final msg = err.toString().toLowerCase();
-    if (msg.contains('409') || msg.contains('already') || msg.contains('conflict')) {
+    if (msg.contains('409') ||
+        msg.contains('already') ||
+        msg.contains('conflict')) {
       return 'Este correo ya está registrado. Iniciá sesión o usá otro correo.';
     }
-    if (msg.contains('network') || msg.contains('connection') || msg.contains('socketexception')) {
+    if (msg.contains('network') ||
+        msg.contains('connection') ||
+        msg.contains('socketexception')) {
       return 'Sin conexión. Verificá tu internet.';
     }
     if (msg.contains('400')) {
@@ -73,139 +131,188 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final isLoading = ref.watch(authStateProvider).isLoading;
 
     return Scaffold(
-      appBar: AppBar(leading: const BackButton()),
+      appBar: AppBar(
+        leading: BackButton(onPressed: () => context.go(AppRoutes.login)),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Crear cuenta',
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Comienza a controlar tus finanzas hoy',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withAlpha(14),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: _nameCtrl,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre completo',
-                          prefixIcon: Icon(Icons.person_outlined),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Requerido';
-                          if (v.trim().length < 2) return 'Muy corto';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Correo electrónico',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Requerido';
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return 'Correo inválido';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordCtrl,
-                        obscureText: _obscure,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña',
-                          prefixIcon: const Icon(Icons.lock_outlined),
-                          helperText: 'Mínimo 8 caracteres',
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                            onPressed: () => setState(() => _obscure = !_obscure),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Crear cuenta',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Comienza a controlar tus finanzas hoy',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Requerido';
-                          if (v.length < 8) return 'Mínimo 8 caracteres';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      CheckboxListTile(
-                        value: _agreed,
-                        onChanged: (v) => setState(() => _agreed = v ?? false),
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Acepto los términos y condiciones'),
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: isLoading ? null : _submit,
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('Crear cuenta'),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '¿Ya tienes cuenta? ',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          GestureDetector(
-                            onTap: () => context.go(AppRoutes.login),
-                            child: Text(
-                              'Inicia sesión',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).shadowColor.withAlpha(14),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _nameCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Nombre completo',
+                              prefixIcon: Icon(Icons.person_outlined),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Requerido';
+                              }
+                              if (v.trim().length < 2) return 'Muy corto';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Correo electrónico',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Requerido';
+                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
+                                return 'Correo inválido';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            obscureText: _obscure,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _submit(),
+                            decoration: InputDecoration(
+                              labelText: 'Contraseña',
+                              prefixIcon: const Icon(Icons.lock_outlined),
+                              helperText: 'Mínimo 8 caracteres',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscure
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Requerido';
+                              if (v.length < 8) return 'Mínimo 8 caracteres';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          CheckboxListTile(
+                            value: _agreed,
+                            onChanged: (v) =>
+                                setState(() => _agreed = v ?? false),
+                            contentPadding: EdgeInsets.zero,
+                            title:
+                                const Text('Acepto los términos y condiciones'),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed: isLoading ? null : _submit,
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Crear cuenta'),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '¿Ya tienes cuenta? ',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              GestureDetector(
+                                onTap: () => context.go(AppRoutes.login),
+                                child: Text(
+                                  'Inicia sesión',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  'o regístrate con',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          GoogleAuthButton(
+                            isLoading: isLoading,
+                            isSignUp: true,
+                            onPressed: _signInWithGoogle,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

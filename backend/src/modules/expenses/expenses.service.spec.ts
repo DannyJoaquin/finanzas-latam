@@ -5,6 +5,9 @@ import { ExpensesService } from './expenses.service';
 import { Expense } from './expense.entity';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CashTransaction } from '../cash/cash-transaction.entity';
+import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
+import { CategorizationLearningService } from '../categorization/categorization-learning.service';
+import { RulesEvaluatorService } from '../rules/rules-evaluator.service';
 
 // Mock the queryBuilder chain
 const createQbMock = (items: any[] = [], total = 0) => ({
@@ -45,6 +48,21 @@ const mockCashTxRepo = () => ({
   remove: jest.fn(),
 });
 
+const mockCategorizationService = () => ({
+  suggest: jest.fn(),
+  shouldAutoAssign: jest.fn().mockReturnValue(false),
+  createAuditLog: jest.fn(),
+  markCorrected: jest.fn(),
+});
+
+const mockLearningService = () => ({
+  recordFeedback: jest.fn(),
+});
+
+const mockRulesEvaluatorService = () => ({
+  evaluateOnExpense: jest.fn(),
+});
+
 describe('ExpensesService', () => {
   let service: ExpensesService;
   let repo: ReturnType<typeof mockExpenseRepo>;
@@ -69,6 +87,9 @@ describe('ExpensesService', () => {
         { provide: getRepositoryToken(Expense), useFactory: mockExpenseRepo },
         { provide: getRepositoryToken(CashAccount), useFactory: mockCashAccountRepo },
         { provide: getRepositoryToken(CashTransaction), useFactory: mockCashTxRepo },
+        { provide: ExpenseCategorizationService, useFactory: mockCategorizationService },
+        { provide: CategorizationLearningService, useFactory: mockLearningService },
+        { provide: RulesEvaluatorService, useFactory: mockRulesEvaluatorService },
       ],
     }).compile();
 
@@ -172,6 +193,36 @@ describe('ExpensesService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it('allows an overdue recurring occurrence with identical details', async () => {
+      repo.findOne.mockResolvedValue(mockExpense());
+      const created = mockExpense();
+      repo.create.mockReturnValue(created);
+      repo.save.mockResolvedValue(created);
+
+      const result = await service.create(
+        userId,
+        {
+          amount: 250,
+          description: 'Almuerzo',
+          date: '2026-04-01',
+          categoryId: 'cat-1',
+        } as any,
+        {
+          recurringExpenseId: 'recurring-1',
+          recurringScheduledDate: '2026-04-01',
+        },
+      );
+
+      expect(result).toEqual(created);
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isRecurring: true,
+          recurringExpenseId: 'recurring-1',
+          recurringScheduledDate: new Date('2026-04-01'),
+        }),
+      );
+    });
+
     it('throws BadRequestException on foreign key violation (invalid category)', async () => {
       repo.findOne.mockResolvedValue(null);
       repo.create.mockReturnValue({});
@@ -195,6 +246,21 @@ describe('ExpensesService', () => {
       const result = await service.update(userId, expenseId, { amount: 300 } as any);
       expect(result.amount).toBe(300);
     });
+
+    it('edits a generated occurrence without changing its recurring link', async () => {
+      const generated = {
+        ...mockExpense(),
+        isRecurring: true,
+        recurringExpenseId: 'recurring-1',
+      } as Expense;
+      repo.findOne.mockResolvedValue(generated);
+      repo.save.mockResolvedValue({ ...generated, amount: 300 });
+
+      const result = await service.update(userId, expenseId, { amount: 300 } as any);
+
+      expect(result.amount).toBe(300);
+      expect(generated.recurringExpenseId).toBe('recurring-1');
+    });
   });
 
   // ──────────────────────────────────────────────────────────────
@@ -208,6 +274,20 @@ describe('ExpensesService', () => {
 
       await expect(service.remove(userId, expenseId)).resolves.not.toThrow();
       expect(repo.remove).toHaveBeenCalledWith(expense);
+    });
+
+    it('removes a generated occurrence as a normal expense', async () => {
+      const generated = {
+        ...mockExpense(),
+        isRecurring: true,
+        recurringExpenseId: 'recurring-1',
+        paymentMethod: 'other',
+      } as Expense;
+      repo.findOne.mockResolvedValue(generated);
+      repo.remove.mockResolvedValue(generated);
+
+      await expect(service.remove(userId, expenseId)).resolves.not.toThrow();
+      expect(repo.remove).toHaveBeenCalledWith(generated);
     });
 
     it('throws NotFoundException when expense not found', async () => {

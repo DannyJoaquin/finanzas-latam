@@ -8,6 +8,7 @@ import '../../models/shared_group_model.dart';
 import '../../models/shared_expense_model.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
+import '../../../../core/constants/currency_format.dart';
 
 class AddSharedExpenseScreen extends ConsumerStatefulWidget {
   const AddSharedExpenseScreen({
@@ -196,7 +197,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
     return participants.fold(0.0, (acc, p) => acc + (p['shareAmount'] as double));
   }
 
-  Future<void> _submit(List<SharedMemberModel> members) async {
+  Future<void> _submit(List<SharedMemberModel> members, String currency) async {
     if (!_formKey.currentState!.validate()) return;
     if (_payerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +219,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'La suma de los montos (L ${sum.toStringAsFixed(2)}) no coincide con el total (L ${total.toStringAsFixed(2)})'),
+              'La suma de los montos (${currencySymbol(currency)} ${sum.toStringAsFixed(2)}) no coincide con el total (${currencySymbol(currency)} ${total.toStringAsFixed(2)})'),
           backgroundColor: Colors.red,
         ),
       );
@@ -313,9 +314,9 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 // ── Total Amount ──
                 TextFormField(
                   controller: _totalCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Monto total (L)',
-                    prefixIcon: Icon(Icons.attach_money),
+                  decoration: InputDecoration(
+                    labelText: 'Monto total (${currencySymbol(group.currency)})',
+                    prefixIcon: Icon(Icons.account_balance_wallet_outlined),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setState(() {
@@ -460,7 +461,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                               controller: _customAmounts[m.userId],
                               decoration: InputDecoration(
                                 labelText: m.fullName,
-                                prefixText: 'L ',
+                                prefixText: '${currencySymbol(group.currency)} ',
                               ),
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               onChanged: (_) => _onCustomAmountChanged(m.userId, members),
@@ -479,6 +480,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                     payerId: _payerId,
                     total: double.tryParse(_totalCtrl.text) ?? 0,
                     sum: _previewSum(members),
+                    currency: group.currency,
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -549,7 +551,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: _loading ? null : () => _submit(members),
+                  onPressed: _loading ? null : () => _submit(members, group.currency),
                   child: _loading
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : Text(widget.initialExpense != null ? 'Guardar cambios' : 'Guardar gasto'),
@@ -572,27 +574,35 @@ class _SplitPreview extends StatelessWidget {
     required this.payerId,
     required this.total,
     required this.sum,
+    required this.currency,
   });
   final List<SharedMemberModel> members;
   final List<Map<String, dynamic>> participants;
   final String? payerId;
   final double total;
   final double sum;
+  final String currency;
 
   @override
   Widget build(BuildContext context) {
     final diff = (sum - total).abs();
     final isValid = diff <= 0.01;
+    final theme = Theme.of(context);
+    final statusColor = isValid
+        ? (theme.brightness == Brightness.dark ? Colors.green.shade300 : Colors.green.shade800)
+        : (theme.brightness == Brightness.dark ? Colors.orange.shade300 : Colors.orange.shade800);
+    final statusBackground = Color.alphaBlend(
+      statusColor.withValues(alpha: theme.brightness == Brightness.dark ? 0.16 : 0.08),
+      theme.colorScheme.surfaceContainerLow,
+    );
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isValid
-            ? Colors.green.shade50
-            : Colors.orange.shade50,
+        color: statusBackground,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isValid ? Colors.green.shade200 : Colors.orange.shade200,
+          color: statusColor.withValues(alpha: 0.55),
         ),
       ),
       child: Column(
@@ -603,7 +613,7 @@ class _SplitPreview extends StatelessWidget {
               Icon(
                 isValid ? Icons.check_circle_outline : Icons.warning_amber_outlined,
                 size: 16,
-                color: isValid ? Colors.green.shade700 : Colors.orange.shade700,
+                color: statusColor,
               ),
               const SizedBox(width: 6),
               Text(
@@ -611,7 +621,7 @@ class _SplitPreview extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: isValid ? Colors.green.shade800 : Colors.orange.shade800,
+                  color: statusColor,
                 ),
               ),
             ],
@@ -629,12 +639,19 @@ class _SplitPreview extends StatelessWidget {
                   Expanded(
                     child: Text(
                       isPayer ? '$name (pagador)' : name,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
                   Text(
-                    'L ${shareAmt.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    '${currencySymbol(currency)} ${shareAmt.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
                 ],
               ),
@@ -643,14 +660,20 @@ class _SplitPreview extends StatelessWidget {
           const Divider(height: 16),
           Row(
             children: [
-              const Expanded(
-                child: Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Text(
+                  'Total',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
               ),
               Text(
-                'L ${sum.toStringAsFixed(2)} / L ${total.toStringAsFixed(2)}',
+                '${currencySymbol(currency)} ${sum.toStringAsFixed(2)} / ${currencySymbol(currency)} ${total.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: isValid ? Colors.green.shade800 : Colors.orange.shade800,
+                  color: statusColor,
                 ),
               ),
             ],

@@ -1,8 +1,13 @@
 import {
-  Body, Controller, Delete, Get, HttpCode, HttpStatus,
-  Param, ParseUUIDPipe, Post,
+  Body, Controller, Delete, Get, HttpCode, HttpStatus, Param,
+  ParseUUIDPipe, Patch, Post,
 } from '@nestjs/common';
-import { CashService, CashOperationDto, CreateCashAccountDto } from './cash.service';
+import {
+  CashService,
+  CashOperationDto,
+  CreateCashAccountDto,
+  UpdateCashTransactionDto,
+} from './cash.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
 
@@ -48,5 +53,25 @@ export class CashController {
   @Get('accounts/:id/transactions')
   getTransactions(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.cashService.getTransactions(user.id, id);
+  }
+
+  @Patch('accounts/:id/transactions/:transactionId')
+  updateTransaction(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) accountId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+    @Body() dto: UpdateCashTransactionDto,
+  ) {
+    return this.cashService.updateTransaction(user.id, accountId, transactionId, dto);
+  }
+
+  @Delete('accounts/:id/transactions/:transactionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteTransaction(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) accountId: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+  ) {
+    return this.cashService.deleteTransaction(user.id, accountId, transactionId);
   }
 }

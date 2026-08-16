@@ -1,35 +1,68 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-/// Handles Google Sign-In flow on the device.
+/// Handles Google Sign-In flow on the device and Web.
 /// Responsible ONLY for getting the idToken from Google — backend does the rest.
 ///
-/// IMPORTANT: [serverClientId] must be the **Web** OAuth 2.0 client ID from
-/// Google Cloud Console (NOT the Android client ID). This is required so that
-/// Google returns an idToken that the backend can verify with google-auth-library.
+/// The Web OAuth client ID must be supplied with `GOOGLE_WEB_CLIENT_ID` at
+/// build time. Native platforms use that same Web client as serverClientId so
+/// that the backend can verify the returned idToken.
 class GoogleAuthService {
-  GoogleAuthService({String? serverClientId})
+  static const _webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  static final GoogleAuthService instance = GoogleAuthService._();
+
+  static String get _configuredClientId {
+    if (_webClientId.isEmpty) {
+      throw StateError(
+        'Google OAuth Web client ID is missing. '
+        'Build with --dart-define=GOOGLE_WEB_CLIENT_ID=...',
+      );
+    }
+    return _webClientId;
+  }
+
+  factory GoogleAuthService({String? serverClientId}) => instance;
+
+  GoogleAuthService._({String? serverClientId})
       : _googleSignIn = GoogleSignIn(
           scopes: ['email', 'profile'],
-          serverClientId: serverClientId ??
-              '642124641220-oh2b998fll013blsj104l8v0gmrpoko8.apps.googleusercontent.com',
+          clientId: kIsWeb ? _configuredClientId : null,
+          serverClientId: kIsWeb ? null : serverClientId ?? _configuredClientId,
         );
 
   final GoogleSignIn _googleSignIn;
 
+  Stream<void> get onWebSignIn => _googleSignIn.onCurrentUserChanged
+      .where((account) => account != null)
+      .map((_) {});
+
   /// Returns the Google idToken, or null if the user cancelled.
   /// Throws on unexpected error so the caller can surface a message.
   Future<String?> signIn() async {
-    // Sign out first to always show account picker
-    await _googleSignIn.signOut();
+    if (kIsWeb) {
+      final account = _googleSignIn.currentUser;
+      if (account == null) {
+        throw StateError(
+          'Google Web sign-in must be started with the Google button.',
+        );
+      }
+      return _idTokenFromAccount(account);
+    }
+
+    if (!kIsWeb) await _googleSignIn.signOut();
     final account = await _googleSignIn.signIn();
     if (account == null) return null; // user cancelled
 
+    return _idTokenFromAccount(account);
+  }
+
+  Future<String> _idTokenFromAccount(GoogleSignInAccount account) async {
     final auth = await account.authentication;
     final idToken = auth.idToken;
     if (idToken == null) {
       throw Exception(
         'Google did not return an idToken. '
-        'Ensure serverClientId is set to the Web OAuth client ID.',
+        'Ensure the Google OAuth client ID is configured.',
       );
     }
     return idToken;

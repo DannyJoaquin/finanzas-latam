@@ -45,6 +45,21 @@ export class CashOperationDto {
   date?: string;
 }
 
+export class UpdateCashTransactionDto {
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  amount?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+}
+
 @Injectable()
 export class CashService {
   constructor(
@@ -134,6 +149,62 @@ export class CashService {
       order: { date: 'DESC', createdAt: 'DESC' },
       take: 100,
     });
+  }
+
+  async updateTransaction(
+    userId: string,
+    accountId: string,
+    transactionId: string,
+    dto: UpdateCashTransactionDto,
+  ): Promise<CashTransaction> {
+    const account = await this.findAccount(userId, accountId);
+    const transaction = await this.txRepo.findOne({
+      where: { id: transactionId, cashAccountId: accountId, userId },
+    });
+    if (!transaction) throw new NotFoundException('Cash transaction not found');
+    if (transaction.type !== CashTxType.DEPOSIT && transaction.type !== CashTxType.WITHDRAW) {
+      throw new BadRequestException('Only deposits and withdrawals can be edited');
+    }
+
+    const oldEffect = transaction.type === CashTxType.DEPOSIT
+      ? Number(transaction.amount)
+      : -Number(transaction.amount);
+    const newAmount = dto.amount ?? Number(transaction.amount);
+    const newEffect = transaction.type === CashTxType.DEPOSIT ? newAmount : -newAmount;
+    const nextBalance = Number(account.balance) - oldEffect + newEffect;
+    if (nextBalance < 0) throw new BadRequestException('Insufficient cash balance');
+
+    account.balance = nextBalance;
+    await this.accountRepo.save(account);
+    Object.assign(transaction, {
+      amount: newAmount,
+      description: dto.description ?? transaction.description,
+      ...(dto.date ? { date: new Date(dto.date) } : {}),
+    });
+    return this.txRepo.save(transaction);
+  }
+
+  async deleteTransaction(userId: string, accountId: string, transactionId: string): Promise<void> {
+    const account = await this.findAccount(userId, accountId);
+    const transaction = await this.txRepo.findOne({
+      where: { id: transactionId, cashAccountId: accountId, userId },
+    });
+    if (!transaction) throw new NotFoundException('Cash transaction not found');
+    if (transaction.type !== CashTxType.DEPOSIT && transaction.type !== CashTxType.WITHDRAW) {
+      throw new BadRequestException('Only deposits and withdrawals can be deleted');
+    }
+
+    const effect = transaction.type === CashTxType.DEPOSIT
+      ? Number(transaction.amount)
+      : -Number(transaction.amount);
+    const nextBalance = Number(account.balance) - effect;
+    if (nextBalance < 0) {
+      throw new BadRequestException('Cannot delete deposit: balance would become negative');
+    }
+
+    account.balance = nextBalance;
+    await this.accountRepo.save(account);
+    await this.txRepo.remove(transaction);
   }
 
   async deleteAccount(userId: string, id: string): Promise<void> {

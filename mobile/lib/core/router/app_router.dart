@@ -6,10 +6,13 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/models/auth_models.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/pin_setup_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/expenses_list_screen.dart';
+import '../../features/expenses/presentation/screens/recurring_expenses_screen.dart';
 import '../../features/incomes/presentation/screens/incomes_screen.dart';
 import '../../features/budgets/presentation/screens/budgets_screen.dart';
 import '../../features/goals/presentation/screens/goals_screen.dart';
@@ -37,11 +40,14 @@ class AppRoutes {
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
+  static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const pinSetup = '/pin-setup';
   static const onboarding = '/onboarding';
   static const home = '/home';
   static const expenses = '/expenses';
   static const addExpense = '/expenses/add';
+  static const recurringExpenses = '/expenses/recurring';
   static const incomes = '/incomes';
   static const budgets = '/budgets';
   static const goals = '/goals';
@@ -89,6 +95,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final userId = authAsync.valueOrNull?.user?.id;
       final isAuthRoute = state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register ||
+          state.matchedLocation == AppRoutes.forgotPassword ||
+          state.matchedLocation == AppRoutes.resetPassword ||
           state.matchedLocation == AppRoutes.pinSetup;
       final isSplash = state.matchedLocation == AppRoutes.splash;
       final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
@@ -97,11 +105,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
       if (isLoggedIn && isAuthRoute) {
         // Show onboarding first if this user hasn't completed it before
-        if (!hasCompletedOnboarding(userId: userId)) return AppRoutes.onboarding;
+        if (!hasCompletedOnboarding(userId: userId))
+          return AppRoutes.onboarding;
         return AppRoutes.home;
       }
       // Redirect authenticated user to onboarding if not completed
-      if (isLoggedIn && !isOnboarding && !hasCompletedOnboarding(userId: userId)) {
+      if (isLoggedIn &&
+          !isOnboarding &&
+          !hasCompletedOnboarding(userId: userId)) {
         return AppRoutes.onboarding;
       }
       return null;
@@ -120,6 +131,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => const RegisterScreen(),
       ),
       GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (c, s) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (c, s) => ResetPasswordScreen(
+          token: s.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.pinSetup,
         builder: (c, s) => const PinSetupScreen(),
       ),
@@ -128,7 +149,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => const OnboardingScreen(),
       ),
       ShellRoute(
-        builder: (c, s, child) => AppShell(child: child),
+        builder: (c, s, child) => AppShell(location: s.uri.path, child: child),
         routes: [
           GoRoute(path: AppRoutes.home, builder: (c, s) => const HomeScreen()),
           GoRoute(
@@ -139,15 +160,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: 'add',
                 builder: (c, s) => const AddExpenseScreen(),
               ),
+              GoRoute(
+                path: 'recurring',
+                builder: (c, s) => const RecurringExpensesScreen(),
+              ),
             ],
           ),
-          GoRoute(path: AppRoutes.incomes, builder: (c, s) => const IncomesScreen()),
-          GoRoute(path: AppRoutes.budgets, builder: (c, s) => const BudgetsScreen()),
-          GoRoute(path: AppRoutes.goals, builder: (c, s) => const GoalsScreen()),
-          GoRoute(path: AppRoutes.analytics, builder: (c, s) => const AnalyticsScreen()),
-          GoRoute(path: AppRoutes.simulator, builder: (c, s) => const SimulatorScreen()),
-          GoRoute(path: AppRoutes.rules, builder: (c, s) => const RulesScreen()),
-          GoRoute(path: AppRoutes.achievements, builder: (c, s) => const AchievementsScreen()),
+          GoRoute(
+              path: AppRoutes.incomes,
+              builder: (c, s) => const IncomesScreen()),
+          GoRoute(
+              path: AppRoutes.budgets,
+              builder: (c, s) => const BudgetsScreen()),
+          GoRoute(
+              path: AppRoutes.goals, builder: (c, s) => const GoalsScreen()),
+          GoRoute(
+              path: AppRoutes.analytics,
+              builder: (c, s) => const AnalyticsScreen()),
+          GoRoute(
+              path: AppRoutes.simulator,
+              builder: (c, s) => const SimulatorScreen()),
+          GoRoute(
+              path: AppRoutes.rules, builder: (c, s) => const RulesScreen()),
+          GoRoute(
+              path: AppRoutes.achievements,
+              builder: (c, s) => const AchievementsScreen()),
           GoRoute(
             path: AppRoutes.settings,
             builder: (c, s) => const SettingsScreen(),
@@ -163,19 +200,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
-          GoRoute(path: AppRoutes.creditCards, builder: (c, s) => const CreditCardsScreen()),
-          GoRoute(path: AppRoutes.loanCalculator, builder: (c, s) => const LoanCalculatorScreen()),
+          GoRoute(
+              path: AppRoutes.creditCards,
+              builder: (c, s) => const CreditCardsScreen()),
+          GoRoute(
+              path: AppRoutes.loanCalculator,
+              builder: (c, s) => const LoanCalculatorScreen()),
           GoRoute(
             path: AppRoutes.shared,
             builder: (c, s) => const SharedGroupsScreen(),
             routes: [
               GoRoute(
                 path: ':id',
-                builder: (c, s) => SharedGroupDetailScreen(groupId: s.pathParameters['id']!),
+                builder: (c, s) =>
+                    SharedGroupDetailScreen(groupId: s.pathParameters['id']!),
                 routes: [
                   GoRoute(
                     path: 'add-expense',
-                    builder: (c, s) => AddSharedExpenseScreen(groupId: s.pathParameters['id']!),
+                    builder: (c, s) => AddSharedExpenseScreen(
+                        groupId: s.pathParameters['id']!),
                   ),
                 ],
               ),

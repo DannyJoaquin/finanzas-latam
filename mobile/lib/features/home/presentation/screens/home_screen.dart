@@ -21,7 +21,6 @@ import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../settings/providers/notification_prefs_provider.dart';
 import '../../../shared/providers/shared_groups_provider.dart';
-import '../../../shared/models/shared_balance_model.dart';
 
 /// Reusable "glow card" decoration shared by the dashboard cards for a
 /// consistent modern look: rounded corners, a soft color-tinted ambient
@@ -43,9 +42,14 @@ BoxDecoration _glowCardDecoration(
   final isDark = theme.brightness == Brightness.dark;
   final shadowTint = glowColor ?? theme.colorScheme.primary;
   return BoxDecoration(
-    color: isDark ? const Color(0xFF141826) : theme.colorScheme.surfaceContainerLow,
+    color: isDark
+        ? const Color(0xFF141826)
+        : theme.colorScheme.surfaceContainerLow,
     gradient: gradient != null
-        ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradient)
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient)
         : null,
     borderRadius: BorderRadius.circular(radius),
     border: Border.all(
@@ -54,7 +58,8 @@ BoxDecoration _glowCardDecoration(
     ),
     boxShadow: [
       BoxShadow(
-        color: shadowTint.withAlpha(subtle ? (isDark ? 16 : 6) : (isDark ? 46 : 16)),
+        color: shadowTint
+            .withAlpha(subtle ? (isDark ? 16 : 6) : (isDark ? 46 : 16)),
         blurRadius: subtle ? 22 : 30,
         offset: Offset(0, subtle ? 8 : 12),
       ),
@@ -115,7 +120,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final userId = ref.read(authStateProvider).valueOrNull?.user?.id;
+      final auth = ref.read(authStateProvider);
+      if (auth.isLoading) return;
+      final userId = auth.valueOrNull?.user?.id;
+      if (userId == null) return;
       if (!TutorialService().isOnboardingDone(userId: userId)) {
         context.go(AppRoutes.onboarding);
       }
@@ -126,7 +134,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final dashAsync = ref.watch(dashboardProvider);
     final insightsAsync = ref.watch(insightsProvider);
-    final isSimple = ref.watch(isSimpleModeProvider); // top-level watch — always subscribed
+    final isSimple =
+        ref.watch(isSimpleModeProvider); // top-level watch — always subscribed
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
     final unreadCount = insightsAsync.valueOrNull
@@ -164,7 +173,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         color: AppColors.error,
                         shape: BoxShape.circle,
                       ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
                       child: Text(
                         '$unreadCount',
                         style: const TextStyle(
@@ -189,7 +199,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: dashAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(dashboardProvider)),
+        error: (e, _) => AppErrorWidget(
+            error: e, onRetry: () => ref.invalidate(dashboardProvider)),
         data: (dash) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(dashboardProvider);
@@ -239,17 +250,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 16),
               _BalanceCard(dash: dash, isSimple: isSimple),
-              if (!isSimple) ...[const SizedBox(height: 12), _SharedSummaryCard()],
-              if (!isSimple) ...[const SizedBox(height: 12), _CashPreviewCard()],
+              if (!isSimple) ...[
+                const SizedBox(height: 12),
+                const _SharedSummaryCard()
+              ],
+              if (!isSimple) ...[
+                const SizedBox(height: 12),
+                _CashPreviewCard()
+              ],
               if (!isSimple && dash.creditCardTotal > 0) ...[
                 const SizedBox(height: 12),
-                _CreditCardDebtCard(amount: dash.creditCardTotal, amountUSD: dash.creditCardTotalUSD, periodStart: dash.periodStart, periodEnd: dash.periodEnd),
+                _CreditCardDebtCard(
+                    amount: dash.creditCardTotal,
+                    amountUSD: dash.creditCardTotalUSD,
+                    periodStart: dash.periodStart,
+                    periodEnd: dash.periodEnd),
               ],
               const SizedBox(height: 16),
-              if (isSimple) const _SimplePrimaryButton() else const _QuickActions(),
+              if (isSimple)
+                const _SimplePrimaryButton()
+              else
+                const _QuickActions(),
               const SizedBox(height: 16),
-              if (!isSimple) ...[_InsightsSection(), const SizedBox(height: 16)],
-              _TopCategories(categories: dash.topCategories, isSimple: isSimple),
+              if (!isSimple) ...[
+                _InsightsSection(),
+                const SizedBox(height: 16)
+              ],
+              _TopCategories(
+                  categories: dash.topCategories, isSimple: isSimple),
               if (!isSimple) ...[
                 const SizedBox(height: 16),
                 _RecentExpenses(expenses: dash.recentExpenses),
@@ -275,7 +303,12 @@ void _showNotificationsPanel(BuildContext context, WidgetRef ref) {
 }
 
 class _NotificationsPanel extends ConsumerWidget {
-  static const _priorityOrder = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1};
+  static const _priorityOrder = {
+    'critical': 4,
+    'high': 3,
+    'medium': 2,
+    'low': 1
+  };
   static const _motivationTypes = {'streak', 'achievement'};
 
   @override
@@ -295,7 +328,8 @@ class _NotificationsPanel extends ConsumerWidget {
         children: [
           const SizedBox(height: 8),
           Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
               borderRadius: BorderRadius.circular(2),
@@ -307,10 +341,14 @@ class _NotificationsPanel extends ConsumerWidget {
               children: [
                 const Icon(Icons.notifications_outlined),
                 const SizedBox(width: 10),
-                Text(
-                  'Notificaciones',
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Text(
+                    'Notificaciones',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const Spacer(),
                 insightsAsync.when(
@@ -327,16 +365,21 @@ class _NotificationsPanel extends ConsumerWidget {
                               ref.invalidate(insightsProvider);
                             },
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
                               foregroundColor: Colors.grey,
                             ),
-                            child: const Text('Limpiar todo', style: TextStyle(fontSize: 12)),
+                            child: const Text('Limpiar todo',
+                                style: TextStyle(fontSize: 12)),
                           ),
                         if (unread > 0)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -361,7 +404,8 @@ class _NotificationsPanel extends ConsumerWidget {
           Expanded(
             child: insightsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(insightsProvider)),
+              error: (e, _) => AppErrorWidget(
+                  error: e, onRetry: () => ref.invalidate(insightsProvider)),
               data: (insights) {
                 if (insights.isEmpty) {
                   return Padding(
@@ -391,12 +435,16 @@ class _NotificationsPanel extends ConsumerWidget {
                     return (b.generatedAt ?? '').compareTo(a.generatedAt ?? '');
                   });
 
-                final alerts = sorted.where((i) =>
-                    !_motivationTypes.contains(i.type) &&
-                    (i.priority == 'critical' || i.priority == 'high')).toList();
-                final suggestions = sorted.where((i) =>
-                    !_motivationTypes.contains(i.type) &&
-                    (i.priority == 'medium' || i.priority == 'low')).toList();
+                final alerts = sorted
+                    .where((i) =>
+                        !_motivationTypes.contains(i.type) &&
+                        (i.priority == 'critical' || i.priority == 'high'))
+                    .toList();
+                final suggestions = sorted
+                    .where((i) =>
+                        !_motivationTypes.contains(i.type) &&
+                        (i.priority == 'medium' || i.priority == 'low'))
+                    .toList();
                 final achievements = sorted
                     .where((i) => _motivationTypes.contains(i.type))
                     .toList();
@@ -564,10 +612,11 @@ class _InsightListTile extends StatelessWidget {
             Container(width: 3, color: borderColor),
             Expanded(
               child: ListTile(
-                leading: Icon(_insightIcon(insight.type), color: iconColor, size: 22),
-                title: Text(
-                    _normalizeNotificationText(insight.title),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                leading: Icon(_insightIcon(insight.type),
+                    color: iconColor, size: 22),
+                title: Text(_normalizeNotificationText(insight.title),
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
                 subtitle: Text(_normalizeNotificationText(insight.body),
@@ -599,9 +648,8 @@ class _InsightListTile extends StatelessWidget {
 /// A hand-cut dashed rule faking the perforated tear-line of a paper
 /// ticket. No custom painter needed — just spaced containers.
 class _DashedLine extends StatelessWidget {
-  const _DashedLine({required this.color, this.height = 1.4});
+  const _DashedLine({required this.color});
   final Color color;
-  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -615,9 +663,10 @@ class _DashedLine extends StatelessWidget {
             count < 0 ? 0 : count,
             (_) => Container(
               width: dashWidth,
-              height: height,
+              height: 1.4,
               margin: const EdgeInsets.only(right: dashSpace),
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1)),
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(1)),
             ),
           ),
         );
@@ -648,7 +697,8 @@ class _PunchDivider extends StatelessWidget {
               (_) => Container(
                 width: 6,
                 height: 6,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+                decoration:
+                    BoxDecoration(shape: BoxShape.circle, color: dotColor),
               ),
             ),
           ),
@@ -662,7 +712,8 @@ class _PunchDivider extends StatelessWidget {
 /// double-ring circle, the way a boarding pass gets stamped at the gate.
 /// Replaces the old pill badge.
 class _CycleStamp extends StatelessWidget {
-  const _CycleStamp({required this.days, required this.color, required this.bg});
+  const _CycleStamp(
+      {required this.days, required this.color, required this.bg});
   final int days;
   final Color color;
   final Color bg;
@@ -745,19 +796,27 @@ class _BalanceCard extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final riskColor = _readableRiskColor(context);
     final riskAccent = (!isSimple && dash.riskLevel == 'yellow')
-      ? (isDark ? const Color(0xFFFFC94D) : const Color(0xFF9A5600))
+        ? (isDark ? const Color(0xFFFFC94D) : const Color(0xFF9A5600))
         : riskColor;
-    final primaryTextColor = isDark ? const Color(0xFFF2F5FB) : theme.colorScheme.onSurface;
+    final primaryTextColor =
+        isDark ? const Color(0xFFF2F5FB) : theme.colorScheme.onSurface;
     final secondaryTextColor =
-      isDark ? const Color(0xFFAEB6C7) : theme.colorScheme.onSurfaceVariant;
-    final cycleBadgeBg = isDark ? const Color(0xFF1A4C39) : riskAccent.withAlpha(62);
+        isDark ? const Color(0xFFAEB6C7) : theme.colorScheme.onSurfaceVariant;
+    final cycleBadgeBg =
+        isDark ? const Color(0xFF1A4C39) : riskAccent.withAlpha(62);
     final cycleBadgeColor = isDark ? const Color(0xFF89F5B6) : riskAccent;
     final bgGradient = isDark
         ? const [Color(0xFF1B2333), Color(0xFF10151F)]
-        : [Colors.white, Color.alphaBlend(theme.colorScheme.primary.withAlpha(12), Colors.white)];
+        : [
+            Colors.white,
+            Color.alphaBlend(
+                theme.colorScheme.primary.withAlpha(12), Colors.white)
+          ];
 
-    final dividerLine = (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 32 : 20);
-    final dividerDot = (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 24 : 14);
+    final dividerLine =
+        (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 32 : 20);
+    final dividerDot =
+        (isDark ? Colors.white : Colors.black).withAlpha(isDark ? 24 : 14);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -793,13 +852,15 @@ class _BalanceCard extends ConsumerWidget {
                 const SizedBox(height: 14),
                 Text(
                   fmt.format(dash.balance),
-                  style: (isSimple ? theme.textTheme.displayMedium : theme.textTheme.displaySmall)
+                  style: (isSimple
+                          ? theme.textTheme.displayMedium
+                          : theme.textTheme.displaySmall)
                       ?.copyWith(
-                        fontWeight: isSimple ? FontWeight.w900 : FontWeight.bold,
-                        color: primaryTextColor,
-                        letterSpacing: -0.5,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+                    fontWeight: isSimple ? FontWeight.w900 : FontWeight.bold,
+                    color: primaryTextColor,
+                    letterSpacing: -0.5,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
                 if (!isSimple) ...[
                   const SizedBox(height: 4),
@@ -841,7 +902,10 @@ class _BalanceCard extends ConsumerWidget {
           Positioned(
             top: -10,
             right: 18,
-            child: _CycleStamp(days: dash.daysRemaining, color: cycleBadgeColor, bg: cycleBadgeBg),
+            child: _CycleStamp(
+                days: dash.daysRemaining,
+                color: cycleBadgeColor,
+                bg: cycleBadgeBg),
           ),
       ],
     );
@@ -850,7 +914,10 @@ class _BalanceCard extends ConsumerWidget {
 
 class _PredictionRow extends StatelessWidget {
   const _PredictionRow(
-      {required this.dash, required this.riskColor, required this.fmt, this.neutralTextColor});
+      {required this.dash,
+      required this.riskColor,
+      required this.fmt,
+      this.neutralTextColor});
   final DashboardModel dash;
   final Color riskColor;
   final NumberFormat fmt;
@@ -869,9 +936,7 @@ class _PredictionRow extends StatelessWidget {
             child: Text(
               'Al ritmo actual, fondos se agotarían: ${dash.cashRunoutDate}',
               style: TextStyle(
-                  fontSize: 12,
-                  color: riskColor,
-                  fontWeight: FontWeight.w600),
+                  fontSize: 12, color: riskColor, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -886,7 +951,8 @@ class _PredictionRow extends StatelessWidget {
           Expanded(
             child: Text(
               'Al ritmo actual, fondos alcanzan hasta: ${dash.cashRunoutDate}',
-              style: TextStyle(fontSize: 12, color: riskColor, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  fontSize: 12, color: riskColor, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -895,8 +961,8 @@ class _PredictionRow extends StatelessWidget {
 
     return Text(
       'Gasto diario seguro: ${fmt.format(dash.safeDailySpend)}',
-      style: theme.textTheme.bodySmall
-          ?.copyWith(color: neutralTextColor ?? theme.colorScheme.onSurfaceVariant),
+      style: theme.textTheme.bodySmall?.copyWith(
+          color: neutralTextColor ?? theme.colorScheme.onSurfaceVariant),
     );
   }
 }
@@ -928,13 +994,14 @@ class _StatChip extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: isSimple ? 14 : 10),
+            padding: EdgeInsets.symmetric(
+                horizontal: 12, vertical: isSimple ? 14 : 10),
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0x2A1B2333)
-                  : color.withAlpha(20),
+              color: isDark ? const Color(0x2A1B2333) : color.withAlpha(20),
               borderRadius: BorderRadius.circular(12),
-              border: isDark ? Border.all(color: tone.withAlpha(54), width: 1) : null,
+              border: isDark
+                  ? Border.all(color: tone.withAlpha(54), width: 1)
+                  : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -980,14 +1047,19 @@ class _CashPreviewCard extends ConsumerWidget {
     final accountsAsync = ref.watch(cashAccountsProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF123228) : theme.colorScheme.secondaryContainer;
-    final cardBg2 = isDark ? const Color(0xFF0E2C23) : theme.colorScheme.secondaryContainer;
-    final textColor = isDark ? const Color(0xFFD2F5E7) : theme.colorScheme.onSecondaryContainer;
+    final cardBg =
+        isDark ? const Color(0xFF123228) : theme.colorScheme.secondaryContainer;
+    final cardBg2 =
+        isDark ? const Color(0xFF0E2C23) : theme.colorScheme.secondaryContainer;
+    final textColor = isDark
+        ? const Color(0xFFD2F5E7)
+        : theme.colorScheme.onSecondaryContainer;
     final bgGradient = isDark
         ? [cardBg, cardBg2]
         : [
             theme.colorScheme.secondaryContainer,
-            Color.alphaBlend(AppColors.secondary.withAlpha(20), theme.colorScheme.secondaryContainer),
+            Color.alphaBlend(AppColors.secondary.withAlpha(20),
+                theme.colorScheme.secondaryContainer),
           ];
 
     return GestureDetector(
@@ -1022,8 +1094,7 @@ class _CashPreviewCard extends ConsumerWidget {
                 loading: () => const _ShimmerText(),
                 error: (_, __) => Text('Efectivo disponible',
                     style: TextStyle(
-                    color: textColor,
-                        fontWeight: FontWeight.w500)),
+                        color: textColor, fontWeight: FontWeight.w500)),
                 data: (accounts) {
                   if (accounts.isEmpty) {
                     return Text(
@@ -1036,15 +1107,13 @@ class _CashPreviewCard extends ConsumerWidget {
                   }
                   final total = accounts.fold(0.0, (s, a) => s + a.balance);
                   final currency = accounts.first.currency;
-                  final fmt = NumberFormat.currency(
-                      locale: 'en_US', symbol: '$currency ');
+                  final fmt = currencyFmt(currency);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Efectivo disponible',
                           style: TextStyle(
-                              fontSize: 11,
-                              color: textColor.withAlpha(190))),
+                              fontSize: 11, color: textColor.withAlpha(190))),
                       Text(
                         fmt.format(total),
                         style: TextStyle(
@@ -1057,8 +1126,7 @@ class _CashPreviewCard extends ConsumerWidget {
                 },
               ),
             ),
-            Icon(Icons.chevron_right,
-                color: textColor.withAlpha(170)),
+            Icon(Icons.chevron_right, color: textColor.withAlpha(170)),
           ],
         ),
       ),
@@ -1091,14 +1159,16 @@ class _CreditExpensesParams {
 
   @override
   bool operator ==(Object other) =>
-      other is _CreditExpensesParams && other.start == start && other.end == end;
+      other is _CreditExpensesParams &&
+      other.start == start &&
+      other.end == end;
 
   @override
   int get hashCode => Object.hash(start, end);
 }
 
-final _creditExpensesProvider =
-    FutureProvider.autoDispose.family<List<ExpenseModel>, _CreditExpensesParams>(
+final _creditExpensesProvider = FutureProvider.autoDispose
+    .family<List<ExpenseModel>, _CreditExpensesParams>(
   (ref, params) async {
     final dio = ref.watch(dioProvider);
     final resp = await dio.get(ApiConstants.expenses, queryParameters: {
@@ -1108,12 +1178,18 @@ final _creditExpensesProvider =
       'limit': 100,
     });
     final items = resp.data['items'] as List<dynamic>? ?? [];
-    return items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+    return items
+        .map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   },
 );
 
 class _CreditCardDebtCard extends ConsumerWidget {
-  const _CreditCardDebtCard({required this.amount, required this.amountUSD, required this.periodStart, required this.periodEnd});
+  const _CreditCardDebtCard(
+      {required this.amount,
+      required this.amountUSD,
+      required this.periodStart,
+      required this.periodEnd});
   final double amount;
   final double amountUSD;
   final String periodStart;
@@ -1124,18 +1200,23 @@ class _CreditCardDebtCard extends ConsumerWidget {
     final fmt = ref.watch(currencyFmtProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final accentColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
-    final titleColor = isDark ? theme.colorScheme.onSurface : const Color(0xFFA45700);
-    final bodyColor = isDark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF8C4A00);
+    final accentColor =
+        isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
+    final titleColor =
+        isDark ? theme.colorScheme.onSurface : const Color(0xFFA45700);
+    final bodyColor =
+        isDark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF8C4A00);
     final bgGradient = isDark
         ? const [Color(0xFF1C2231), Color(0xFF131925)]
         : [
             const Color(0xFFFFF4E5),
-            Color.alphaBlend(accentColor.withAlpha(16), const Color(0xFFFFF4E5)),
+            Color.alphaBlend(
+                accentColor.withAlpha(16), const Color(0xFFFFF4E5)),
           ];
 
     return GestureDetector(
-      onTap: () => _showCreditDetail(context, periodStart, periodEnd, amount, amountUSD),
+      onTap: () =>
+          _showCreditDetail(context, periodStart, periodEnd, amount, amountUSD),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: _glowCardDecoration(
@@ -1154,7 +1235,8 @@ class _CreditCardDebtCard extends ConsumerWidget {
                 color: accentColor.withAlpha(isDark ? 30 : 34),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.credit_card_rounded, color: accentColor, size: 20),
+              child:
+                  Icon(Icons.credit_card_rounded, color: accentColor, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1178,7 +1260,7 @@ class _CreditCardDebtCard extends ConsumerWidget {
                           color: accentColor),
                     ),
                     Text(
-                      '+ ${NumberFormat.currency(locale: 'en_US', symbol: '\$ ').format(amountUSD)}',
+                      '+ ${currencyFmt('USD').format(amountUSD)}',
                       style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
@@ -1247,13 +1329,17 @@ class _CreditDetailSheet extends ConsumerWidget {
     final fmt = ref.watch(currencyFmtProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final accentColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
-    final titleColor = isDark ? theme.colorScheme.onSurface : const Color(0xFFA45700);
-    final bodyColor = isDark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF8C4A00);
+    final accentColor =
+        isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
+    final titleColor =
+        isDark ? theme.colorScheme.onSurface : const Color(0xFFA45700);
+    final bodyColor =
+        isDark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF8C4A00);
     final infoBgColor = isDark
         ? theme.colorScheme.surfaceContainerHigh.withAlpha(210)
         : const Color(0xFFFFF4E5);
-    final infoBorderColor = isDark ? Colors.white.withAlpha(12) : const Color(0xFFF2D2A2);
+    final infoBorderColor =
+        isDark ? Colors.white.withAlpha(12) : const Color(0xFFF2D2A2);
 
     // Fetch credit card expenses for the current period
     final creditExpensesAsync = ref.watch(_creditExpensesProvider(
@@ -1288,14 +1374,16 @@ class _CreditDetailSheet extends ConsumerWidget {
                     children: [
                       Text(
                         'Gastos del período con crédito',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: titleColor,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: titleColor,
+                                ),
                       ),
                       Text(
                         'Del $periodStart al $periodEnd',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
@@ -1313,7 +1401,7 @@ class _CreditDetailSheet extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '+ ${NumberFormat.currency(locale: 'en_US', symbol: '\$ ').format(totalUSD)}',
+                        '+ ${currencyFmt('USD').format(totalUSD)}',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1362,13 +1450,15 @@ class _CreditDetailSheet extends ConsumerWidget {
               error: (e, _) => AppErrorWidget(error: e),
               data: (expenses) {
                 if (expenses.isEmpty) {
-                  return const Center(child: Text('Sin gastos de crédito en este período'));
+                  return const Center(
+                      child: Text('Sin gastos de crédito en este período'));
                 }
                 return ListView.separated(
                   controller: scrollCtrl,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: expenses.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, indent: 56),
                   itemBuilder: (_, i) {
                     final e = expenses[i];
                     final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
@@ -1395,7 +1485,8 @@ class _CreditDetailSheet extends ConsumerWidget {
                       ),
                       trailing: Text(
                         currencyFmt(e.currency).format(e.amount),
-                        style: TextStyle(fontWeight: FontWeight.w700, color: accentColor),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: accentColor),
                       ),
                     );
                   },
@@ -1436,7 +1527,8 @@ class _SimplePrimaryButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.add_circle_outline, size: 36, color: theme.colorScheme.onPrimary),
+            Icon(Icons.add_circle_outline,
+                size: 36, color: theme.colorScheme.onPrimary),
             const SizedBox(height: 8),
             Text(
               'Registrar gasto',
@@ -1460,7 +1552,8 @@ class _QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final creditAccent = isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
+    final creditAccent =
+        isDark ? const Color(0xFFFFB74D) : const Color(0xFFC96A00);
     return Row(
       children: [
         _ActionButton(
@@ -1497,7 +1590,10 @@ class _QuickActions extends StatelessWidget {
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton(
-      {required this.icon, required this.label, required this.onTap, required this.color});
+      {required this.icon,
+      required this.label,
+      required this.onTap,
+      required this.color});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -1518,7 +1614,8 @@ class _ActionButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color.withAlpha(isDark ? 28 : 18),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: color.withAlpha(isDark ? 50 : 30), width: 1),
+                border: Border.all(
+                    color: color.withAlpha(isDark ? 50 : 30), width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: color.withAlpha(isDark ? 40 : 22),
@@ -1532,7 +1629,9 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(height: 7),
             Text(label,
                 style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -1560,8 +1659,7 @@ class _InsightsSectionState extends ConsumerState<_InsightsSection> {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (insights) {
-        final active =
-            insights.where((i) => !i.isDismissed).toList();
+        final active = insights.where((i) => !i.isDismissed).toList();
         if (active.isEmpty) return const SizedBox.shrink();
 
         final shown = _expanded ? active : active.take(_initialMax).toList();
@@ -1572,12 +1670,14 @@ class _InsightsSectionState extends ConsumerState<_InsightsSection> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Alertas e indicadores',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'Alertas e indicadores',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1592,7 +1692,8 @@ class _InsightsSectionState extends ConsumerState<_InsightsSection> {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           foregroundColor: Colors.grey,
                         ),
-                        child: const Text('Descartar todo', style: TextStyle(fontSize: 12)),
+                        child: const Text('Descartar todo',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     if (active.length > _initialMax)
                       TextButton(
@@ -1600,7 +1701,9 @@ class _InsightsSectionState extends ConsumerState<_InsightsSection> {
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
-                        child: Text(_expanded ? 'Ver menos' : 'Ver más (${active.length - _initialMax})'),
+                        child: Text(_expanded
+                            ? 'Ver menos'
+                            : 'Ver más (${active.length - _initialMax})'),
                       ),
                   ],
                 ),
@@ -1719,16 +1822,21 @@ IconData _insightIcon(String type) {
 }
 
 // �"?�"? Top categories �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
-Widget _categoryIconWidget(String icon, {bool isSimple = false}) {
+Widget _categoryIconWidget(
+  String icon, {
+  bool isSimple = false,
+  Color? accent,
+}) {
   final iconData = materialIconFromString(icon);
+  final iconColor = accent ?? AppColors.warning;
   return Container(
     width: isSimple ? 36 : 30,
     height: isSimple ? 36 : 30,
     decoration: BoxDecoration(
-      color: AppColors.warning.withAlpha(28),
+      color: iconColor.withAlpha(28),
       shape: BoxShape.circle,
     ),
-    child: Icon(iconData, size: isSimple ? 20 : 17, color: AppColors.warning),
+    child: Icon(iconData, size: isSimple ? 20 : 17, color: iconColor),
   );
 }
 
@@ -1740,69 +1848,173 @@ class _TopCategories extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (categories.isEmpty) return const SizedBox.shrink();
+    final visible = categories.take(5).toList();
     final total = categories.fold(0.0, (s, c) => s + c.amount);
+    final maxAmount = visible.fold<double>(
+      0,
+      (max, category) => category.amount > max ? category.amount : max,
+    );
     final fmt = ref.watch(currencyFmtProvider);
+    final theme = Theme.of(context);
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, isSimple ? 14 : 8),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, isSimple ? 16 : 14),
       decoration: _glowCardDecoration(context, radius: 20, subtle: true),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Top gastos',
-                  style: Theme.of(context)
-                      .textTheme
-                    .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              if (isSimple)
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.expenses),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-                  child: const Text('Ver más'),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(22),
+                  borderRadius: BorderRadius.circular(11),
                 ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.insights_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Top gastos',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Categorías con mayor impacto',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => context.go(AppRoutes.expenses),
+                tooltip: 'Ver todos los gastos',
+                icon: const Icon(Icons.arrow_forward_rounded),
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          ...categories.take(5).toList().asMap().entries.map((e) {
-            final pct = total > 0 ? e.value.amount / total : 0.0;
+          const SizedBox(height: 18),
+          ...visible.asMap().entries.map((entry) {
+            final index = entry.key;
+            final category = entry.value;
+            final accent = AppColors
+                .categoryPalette[index % AppColors.categoryPalette.length];
+            final share = category.percentage > 0
+                ? category.percentage
+                : total > 0
+                    ? category.amount / total
+                    : 0.0;
+            final barValue = maxAmount > 0 ? category.amount / maxAmount : 0.0;
             return Padding(
-              padding: EdgeInsets.only(bottom: isSimple ? 14 : 10),
+              padding: EdgeInsets.only(
+                  bottom:
+                      index == visible.length - 1 ? 0 : (isSimple ? 16 : 13)),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _categoryIconWidget(e.value.icon, isSimple: isSimple),
+                  Container(
+                    width: isSimple ? 42 : 34,
+                    height: isSimple ? 42 : 34,
+                    decoration: BoxDecoration(
+                      color: accent.withAlpha(18),
+                      borderRadius: BorderRadius.circular(isSimple ? 14 : 11),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${index + 1}'.padLeft(2, '0'),
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: isSimple ? 14 : 11,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
                   SizedBox(width: isSimple ? 12 : 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(e.value.name,
+                            Expanded(
+                              child: Text(
+                                category.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontSize: isSimple ? 24 : 13,
-                                    fontWeight: isSimple ? FontWeight.w700 : FontWeight.w400)),
-                            Text(fmt.format(e.value.amount),
-                                style: TextStyle(
-                                    fontSize: isSimple ? 28 : 13,
-                                    fontWeight: FontWeight.w700)),
+                                  fontSize: isSimple ? 20 : 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              fmt.format(category.amount),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: isSimple ? 18 : 13,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        SizedBox(height: isSimple ? 8 : 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(isSimple ? 8 : 6),
-                          child: LinearProgressIndicator(
-                            value: pct,
-                            minHeight: isSimple ? 9 : 7,
-                            color: AppColors.categoryPalette[
-                                e.key % AppColors.categoryPalette.length],
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest
-                                .withAlpha(140),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: LinearProgressIndicator(
+                                  value: barValue.clamp(0.0, 1.0),
+                                  minHeight: isSimple ? 8 : 6,
+                                  color: accent,
+                                  backgroundColor: theme
+                                      .colorScheme.surfaceContainerHighest
+                                      .withAlpha(140),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${(share * 100).toStringAsFixed(0)}%',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          index == 0
+                              ? 'Mayor gasto del período'
+                              : 'Del gasto total',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -1827,48 +2039,172 @@ class _RecentExpenses extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (expenses.isEmpty) return const SizedBox.shrink();
     final fmt = ref.watch(currencyFmtProvider);
+    final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: _glowCardDecoration(context, radius: 20, subtle: true),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Gastos recientes',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.expense.withAlpha(18),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 18,
+                  color: AppColors.expense,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gastos recientes',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      '${expenses.take(5).length} movimientos del período',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               TextButton(
                 onPressed: () => context.go(AppRoutes.expenses),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
                 child: const Text('Ver todos'),
               ),
             ],
           ),
-          ...expenses.take(5).map(
-                (e) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: _categoryIconWidget(e.categoryIcon),
-                  title: Text(
-                      e.description.isEmpty ? e.categoryName : e.description),
-                  subtitle: Text(e.categoryName),
-                  trailing: Text(
-                    '-${fmt.format(e.amount)}',
-                    style: const TextStyle(
-                      color: AppColors.expense,
-                      fontWeight: FontWeight.w600,
+          const SizedBox(height: 10),
+          ...expenses.take(5).toList().asMap().entries.map(
+            (entry) {
+              final index = entry.key;
+              final expense = entry.value;
+              final accent = AppColors.categoryPalette[
+                  (index + 1) % AppColors.categoryPalette.length];
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: () => context.go(AppRoutes.expenses),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      child: Row(
+                        children: [
+                          _categoryIconWidget(
+                            expense.categoryIcon,
+                            accent: accent,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  expense.description.isEmpty
+                                      ? expense.categoryName
+                                      : expense.description,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        expense.categoryName.isEmpty
+                                            ? 'Sin categoría'
+                                            : expense.categoryName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6),
+                                      child: Text(
+                                        '·',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.outline,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDashboardDate(expense.date),
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '-${fmt.format(expense.amount)}',
+                            textAlign: TextAlign.right,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: AppColors.expense,
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  onTap: () => context.go(AppRoutes.expenses),
-                ),
-              ),
+                  if (index < expenses.take(5).length - 1)
+                    Divider(
+                      height: 1,
+                      indent: 42,
+                      color: theme.colorScheme.outlineVariant.withAlpha(55),
+                    ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
+}
+
+String _formatDashboardDate(String value) {
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) return value;
+  final formatted = DateFormat('d MMM', 'es').format(parsed);
+  return formatted[0].toUpperCase() + formatted.substring(1);
 }
 
 // ── Shared Groups Summary Card ───────────────────────────────────────────────
@@ -1889,8 +2225,10 @@ class _SharedSummaryCard extends ConsumerWidget {
         if (!summary.hasGroups) return const SizedBox.shrink();
 
         final isDark = theme.brightness == Brightness.dark;
-        final oweColor = isDark ? const Color(0xFF6FE3A0) : Colors.green.shade700;
-        final dueColor = isDark ? const Color(0xFFFFB37A) : Colors.orange.shade700;
+        final oweColor =
+            isDark ? const Color(0xFF6FE3A0) : Colors.green.shade700;
+        final dueColor =
+            isDark ? const Color(0xFFFFB37A) : Colors.orange.shade700;
 
         return GestureDetector(
           onTap: () => context.go(AppRoutes.shared),
@@ -1911,7 +2249,8 @@ class _SharedSummaryCard extends ConsumerWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withAlpha(isDark ? 30 : 24),
+                        color: theme.colorScheme.primary
+                            .withAlpha(isDark ? 30 : 24),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.group_rounded,

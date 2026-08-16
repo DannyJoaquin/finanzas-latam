@@ -36,7 +36,7 @@ IconData materialIconFromString(String name) {
     'shopping_bag': Icons.shopping_bag,
     'savings': Icons.savings,
     'trending_up': Icons.trending_up,
-    'attach_money': Icons.attach_money,
+    'attach_money': Icons.account_balance_wallet_outlined,
     'work': Icons.work,
     'business': Icons.business,
     'celebration': Icons.celebration,
@@ -69,6 +69,9 @@ class ExpenseModel {
     required this.categoryName,
     required this.categoryIcon,
     required this.paymentMethod,
+    this.isRecurring = false,
+    this.source = 'manual',
+    this.recurringExpenseId,
     this.isShared = false,
     this.groupId,
     this.groupName,
@@ -83,6 +86,9 @@ class ExpenseModel {
   final String categoryName;
   final String categoryIcon;
   final String paymentMethod;
+  final bool isRecurring;
+  final String source;
+  final String? recurringExpenseId;
   final bool isShared;
   final String? groupId;
   final String? groupName;
@@ -99,6 +105,10 @@ class ExpenseModel {
       categoryName: cat?['name'] as String? ?? '',
       categoryIcon: cat?['icon'] as String? ?? '💰',
       paymentMethod: j['paymentMethod'] as String? ?? 'cash',
+      isRecurring: j['isRecurring'] as bool? ??
+          j['source'] == 'auto' || j['recurringExpenseId'] != null,
+      source: j['source'] as String? ?? 'manual',
+      recurringExpenseId: j['recurringExpenseId'] as String?,
     );
   }
 
@@ -121,12 +131,23 @@ class ExpenseModel {
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
-final expensesProvider = FutureProvider.autoDispose<List<ExpenseModel>>((ref) async {
+final expensesProvider =
+    FutureProvider.autoDispose<List<ExpenseModel>>((ref) async {
   final dio = ref.watch(dioProvider);
 
-  final personalResp = await dio.get(ApiConstants.expenses, queryParameters: {'limit': 50});
+  // Opening Gastos also processes overdue recurring occurrences on the API.
+  try {
+    await dio.get(ApiConstants.recurringExpenses);
+  } catch (_) {
+    // The expense list remains usable if the optional sync is unavailable.
+  }
+
+  final personalResp =
+      await dio.get(ApiConstants.expenses, queryParameters: {'limit': 50});
   final items = personalResp.data['items'] as List<dynamic>? ?? [];
-  final personal = items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+  final personal = items
+      .map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>))
+      .toList();
 
   List<ExpenseModel> shared = [];
   try {
@@ -146,7 +167,11 @@ final expensesProvider = FutureProvider.autoDispose<List<ExpenseModel>>((ref) as
 
 // ── Category provider (for the add expense form) ─────────────────────────────
 class CategoryOption {
-  const CategoryOption({required this.id, required this.name, required this.iconName, this.parentName});
+  const CategoryOption(
+      {required this.id,
+      required this.name,
+      required this.iconName,
+      this.parentName});
   final String id;
   final String name;
   final String iconName; // Material icon name string from backend
@@ -154,7 +179,9 @@ class CategoryOption {
 
   IconData get iconData => materialIconFromString(iconName);
 
-  factory CategoryOption.fromJson(Map<String, dynamic> j, {String? parentName}) => CategoryOption(
+  factory CategoryOption.fromJson(Map<String, dynamic> j,
+          {String? parentName}) =>
+      CategoryOption(
         id: j['id'] as String,
         name: j['name'] as String,
         iconName: j['icon'] as String? ?? 'category',
@@ -162,7 +189,8 @@ class CategoryOption {
       );
 }
 
-final categoriesProvider = FutureProvider.autoDispose<List<CategoryOption>>((ref) async {
+final categoriesProvider =
+    FutureProvider.autoDispose<List<CategoryOption>>((ref) async {
   final dio = ref.watch(dioProvider);
   final resp = await dio.get(ApiConstants.categories);
   final raw = resp.data as List<dynamic>? ?? [];
@@ -204,10 +232,13 @@ class CategorySuggestion {
 
   final String? categoryId;
   final String? categoryName;
+
   /// 'high' | 'medium' | 'low' | 'none'
   final String confidence;
+
   /// 'user_learning' | 'keyword_rule' | 'merchant_rule' | 'none'
   final String source;
+
   /// What keyword/merchant triggered the match — for display hint
   final String? matchedKeyword;
 
@@ -215,7 +246,8 @@ class CategorySuggestion {
   bool get isHighConfidence => confidence == 'high';
   bool get isMediumConfidence => confidence == 'medium';
 
-  factory CategorySuggestion.fromJson(Map<String, dynamic> j) => CategorySuggestion(
+  factory CategorySuggestion.fromJson(Map<String, dynamic> j) =>
+      CategorySuggestion(
         categoryId: j['suggestedCategoryId'] as String?,
         categoryName: j['suggestedCategoryName'] as String?,
         confidence: j['confidence'] as String? ?? 'none',
@@ -226,14 +258,16 @@ class CategorySuggestion {
 
 /// Calls POST /expenses/suggest-category and returns a suggestion.
 /// Returns null silently if the request fails or description is empty.
-Future<CategorySuggestion?> suggestCategory(dynamic dio, String description) async {
+Future<CategorySuggestion?> suggestCategory(
+    dynamic dio, String description) async {
   if (description.trim().length < 3) return null;
   try {
     final resp = await dio.post(
       '${ApiConstants.expenses}/suggest-category',
       data: {'description': description.trim()},
     );
-    final result = CategorySuggestion.fromJson(resp.data as Map<String, dynamic>);
+    final result =
+        CategorySuggestion.fromJson(resp.data as Map<String, dynamic>);
     return result.hasSuggestion ? result : null;
   } catch (_) {
     return null;
@@ -249,14 +283,12 @@ void sendCategorizationFeedback(
   bool remember = false,
 }) {
   if (description.trim().isEmpty) return;
-  dio
-      .post(
-        '/categorization/feedback',
-        data: {
-          'description': description.trim(),
-          'selectedCategoryId': selectedCategoryId,
-          if (remember) 'remember': true,
-        },
-      )
-      .catchError((_) {});
+  dio.post(
+    '/categorization/feedback',
+    data: {
+      'description': description.trim(),
+      'selectedCategoryId': selectedCategoryId,
+      if (remember) 'remember': true,
+    },
+  ).catchError((_) {});
 }

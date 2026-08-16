@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../providers/shared_groups_provider.dart';
 import '../../models/shared_group_model.dart';
-import 'shared_group_detail_screen.dart';
 
 class SharedGroupsScreen extends ConsumerWidget {
   const SharedGroupsScreen({super.key});
@@ -101,7 +99,7 @@ class _GroupCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fmt = ref.watch(currencyFmtProvider);
+    final fmt = currencyFmt(group.currency);
     final balancesAsync = ref.watch(sharedGroupBalancesProvider(group.id));
     final theme = Theme.of(context);
 

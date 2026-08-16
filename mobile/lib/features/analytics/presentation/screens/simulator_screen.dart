@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/constants/currency_format.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 
@@ -75,9 +77,20 @@ class _SimulatorScreenState extends ConsumerState<SimulatorScreen> {
     final catAsync = ref.watch(categoriesProvider);
     final fmt = ref.watch(currencyFmtProvider);
     final theme = Theme.of(context);
+    final isMobile = MediaQuery.sizeOf(context).width < 900;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Simulador de Ahorro')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: isMobile
+            ? IconButton(
+                tooltip: 'Volver a configuración',
+                onPressed: () => context.go(AppRoutes.settings),
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
+        title: const Text('Simulador de Ahorro'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(

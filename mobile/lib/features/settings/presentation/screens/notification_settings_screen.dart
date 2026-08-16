@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/dio_client.dart';
+import '../../../../core/services/browser_notification_service.dart';
+import '../../../../core/services/fcm_service.dart';
 import '../../providers/notification_prefs_provider.dart';
 
 class NotificationSettingsScreen extends ConsumerWidget {
@@ -22,6 +26,10 @@ class NotificationSettingsScreen extends ConsumerWidget {
         ),
         data: (prefs) => ListView(
           children: [
+            if (kIsWeb) ...[
+              const _SubHeader(label: 'Navegador'),
+              const _BrowserNotificationTile(),
+            ],
             // ── Push ────────────────────────────────────────────────────────
             const _SubHeader(label: 'Notificaciones push'),
             _NotifTile(
@@ -149,6 +157,83 @@ class NotificationSettingsScreen extends ConsumerWidget {
         );
       }
     }
+  }
+}
+
+class _BrowserNotificationTile extends ConsumerStatefulWidget {
+  const _BrowserNotificationTile();
+
+  @override
+  ConsumerState<_BrowserNotificationTile> createState() =>
+      _BrowserNotificationTileState();
+}
+
+class _BrowserNotificationTileState
+    extends ConsumerState<_BrowserNotificationTile> {
+  bool _requesting = false;
+
+  Future<void> _enable() async {
+    if (_requesting) return;
+    setState(() => _requesting = true);
+
+    final granted = await requestBrowserNotificationPermission();
+    if (granted) {
+      await FcmService.instance.registerToken(ref.read(dioProvider));
+    }
+
+    if (!mounted) return;
+    setState(() => _requesting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          granted
+              ? 'Notificaciones del navegador activadas.'
+              : 'No se concedió el permiso de notificaciones.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 320),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.notifications_active_outlined),
+                const SizedBox(width: 16),
+                Text(
+                  'Notificaciones del navegador',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Permite alertas cuando Zentri esté abierta o instalada'),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: _requesting ? null : _enable,
+                icon: _requesting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.notifications_outlined),
+                label: Text(_requesting ? 'Activando' : 'Activar'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

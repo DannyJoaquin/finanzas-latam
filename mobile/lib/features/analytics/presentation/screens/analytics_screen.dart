@@ -232,6 +232,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
               ),
               child: TabBar(
                 controller: _tab,
+                isScrollable: true,
                 tabs: const [
                   Tab(text: 'Resumen'),
                   Tab(text: 'Tendencias'),
@@ -478,7 +479,7 @@ class _TrendsTab extends ConsumerWidget {
                         showTitles: true,
                         reservedSize: 42,
                         getTitlesWidget: (v, _) => Text(
-                          'L ${v.toInt()}',
+                          fmt.format(v),
                           style: const TextStyle(fontSize: 9),
                         ),
                       ),
@@ -494,11 +495,15 @@ class _TrendsTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
               children: [
-                _Legend(color: AppColors.neutral.withAlpha(120), label: 'Período anterior'),
-                const SizedBox(width: 16),
-                const _Legend(color: AppColors.primary, label: 'Período actual'),
+                _Legend(
+                    color: AppColors.neutral.withAlpha(120),
+                    label: 'Período anterior'),
+                const _Legend(
+                    color: AppColors.primary, label: 'Período actual'),
               ],
             ),
             const SizedBox(height: 24),
@@ -882,7 +887,7 @@ class _MethodsTab extends ConsumerWidget {
                               showTitles: true,
                               reservedSize: 40,
                               getTitlesWidget: (v, _) => Text(
-                                'L ${v.toInt()}',
+                                fmt.format(v),
                                 style: const TextStyle(fontSize: 9),
                               ),
                             ),
@@ -896,15 +901,14 @@ class _MethodsTab extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 14,
+                    runSpacing: 8,
                     children: [
                       _Legend(color: _methodColors['cash']!, label: 'Efectivo'),
-                      const SizedBox(width: 14),
                       _Legend(color: _methodColors['card_debit']!, label: 'Débito'),
-                      const SizedBox(width: 14),
                       _Legend(color: _methodColors['card_credit']!, label: 'Crédito'),
-                      const SizedBox(width: 14),
                       _Legend(color: _methodColors['transfer']!, label: 'Transf.'),
                     ],
                   ),

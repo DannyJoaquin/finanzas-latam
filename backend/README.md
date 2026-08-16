@@ -31,6 +31,25 @@
 $ npm install
 ```
 
+## Password reset email
+
+Password recovery uses a short-lived, single-use token stored in Redis. Configure
+the SMTP transport and the web app URL before enabling it outside local development:
+
+```env
+WEB_APP_URL=http://localhost:8092
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_SECURE=false
+MAIL_USER=your-smtp-user
+MAIL_PASSWORD=your-smtp-password
+MAIL_FROM=Zentri <no-reply@example.com>
+```
+
+When `MAIL_HOST` is empty in development, the API logs the reset link instead of
+sending email. The HTTP response remains generic for unknown, Google-only, and
+local accounts so it does not disclose whether an email is registered.
+
 ## Compile and run the project
 
 ```bash

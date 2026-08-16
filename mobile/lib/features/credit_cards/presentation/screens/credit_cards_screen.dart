@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -6,6 +7,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/constants/currency_format.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../models/credit_card_model.dart';
 import '../../providers/credit_cards_provider.dart';
@@ -25,11 +27,7 @@ final _cardExpensesProvider =
 
 // ── Currency formatter ────────────────────────────────────────────────────────
 
-NumberFormat _cardFmt(String currency) => NumberFormat.currency(
-      locale: 'en_US',
-      symbol: currency == 'USD' ? '\$ ' : 'L ',
-      decimalDigits: currency == 'USD' ? 2 : 0,
-    );
+NumberFormat _cardFmt(String currency) => currencyFmt(currency);
 
 // ── Gradient per network ──────────────────────────────────────────────────────
 
@@ -81,6 +79,15 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _goToCard(int index, int count) async {
+    if (index < 0 || index >= count) return;
+    await _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -174,6 +181,7 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
             return _EmptyState(onAdd: () => _showAddCardSheet(context));
           }
           final card = cards[_selectedIndex.clamp(0, cards.length - 1)];
+          final isDesktop = MediaQuery.sizeOf(context).width >= 900;
           // CustomScrollView solves the infinite-width constraint issue.
           // Each SliverToBoxAdapter gives children TIGHT width = viewport width.
           return CustomScrollView(
@@ -206,17 +214,56 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: SizedBox(
-                    height: 210,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: cards.length,
-                      onPageChanged: (i) => setState(() => _selectedIndex = i),
-                      itemBuilder: (_, i) => _CreditCardWidget(
-                        card: cards[i],
-                        isSelected: i == _selectedIndex,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 210,
+                        child: ScrollConfiguration(
+                          behavior: const MaterialScrollBehavior().copyWith(
+                            dragDevices: {
+                              PointerDeviceKind.touch,
+                              PointerDeviceKind.mouse,
+                            },
+                          ),
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: cards.length,
+                            onPageChanged: (i) => setState(() => _selectedIndex = i),
+                            itemBuilder: (_, i) => _CreditCardWidget(
+                              card: cards[i],
+                              isSelected: i == _selectedIndex,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (isDesktop && cards.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                tooltip: 'Tarjeta anterior',
+                                onPressed: _selectedIndex == 0
+                                    ? null
+                                    : () => _goToCard(_selectedIndex - 1, cards.length),
+                                icon: const Icon(Icons.chevron_left),
+                              ),
+                              Text(
+                                '${_selectedIndex + 1} / ${cards.length}',
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              IconButton(
+                                tooltip: 'Tarjeta siguiente',
+                                onPressed: _selectedIndex == cards.length - 1
+                                    ? null
+                                    : () => _goToCard(_selectedIndex + 1, cards.length),
+                                icon: const Icon(Icons.chevron_right),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -883,15 +930,17 @@ class _UtilizationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Utilización del crédito',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Text(
+                    'Utilización del crédito',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '$pct%',
                   style: TextStyle(
@@ -914,23 +963,38 @@ class _UtilizationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final usedText = Text(
                   card.currentBalanceUSD > 0
                       ? 'Usado: ${fmt.format(totalUsedHNL)}  +  ${_cardFmt('USD').format(card.currentBalanceUSD)}'
                       : 'Usado: ${fmt.format(totalUsedHNL)}',
                   style: const TextStyle(fontSize: 12),
-                ),
-                Text(
+                );
+                final limitText = Text(
                   'Límite: ${fmtLimit.format(card.creditLimit!)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 360) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      usedText,
+                      const SizedBox(height: 4),
+                      Align(alignment: Alignment.centerRight, child: limitText),
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [usedText, limitText],
+                );
+              },
             ),
           ],
         ),
@@ -1380,11 +1444,16 @@ class _CardExpensesSection extends ConsumerWidget {
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
-                  Text(
-                    'Ciclo: $cycleStart – $cycleEnd',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant,
+                  Flexible(
+                    child: Text(
+                      'Ciclo: $cycleStart – $cycleEnd',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -1522,11 +1591,15 @@ class _ExpenseCycleSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  dateRange,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: Text(
+                    dateRange,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -1941,7 +2014,7 @@ class _RegisterPaymentSheetState
                     Expanded(
                       child: Text(
                         card.overdueBalanceUSD > 0
-                            ? 'Deuda: ${fmt.format(card.overdueBalanceHNL)}  +  \$ ${card.overdueBalanceUSD.toStringAsFixed(2)}'
+                            ? 'Deuda: ${fmt.format(card.overdueBalanceHNL)}  +  ${currencyFmt('USD').format(card.overdueBalanceUSD)}'
                             : 'Deuda del ciclo cerrado: ${fmt.format(card.overdueBalance)}',
                         style: const TextStyle(
                           fontSize: 12,
@@ -1961,12 +2034,12 @@ class _RegisterPaymentSheetState
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Monto pagado (HNL)',
+                labelText: 'Monto pagado (${currencySymbol('HNL')})',
                 hintText: '0',
-                prefixIcon: const Icon(Icons.payments_outlined),
-                prefixText: 'L ',
+                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                prefixText: '${currencySymbol('HNL')} ',
                 helperText: card.overdueBalanceUSD > 0
-                    ? 'Los \$ ${card.overdueBalanceUSD.toStringAsFixed(2)} USD se registran por separado'
+                  ? 'La deuda en dólares se registra por separado: ${currencyFmt('USD').format(card.overdueBalanceUSD)}'
                     : null,
               ),
             ),
@@ -2262,7 +2335,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: 'Límite de crédito (opcional)',
-                        prefixText: _limitCurrency == 'USD' ? '\$ ' : 'L ',
+                        prefixText: '${currencySymbol(_limitCurrency)} ',
                         prefixIcon: const Icon(Icons.show_chart),
                         helperText: 'Para mostrar % de utilización',
                       ),
@@ -2272,9 +2345,9 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: SegmentedButton<String>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(value: 'HNL', label: Text('L')),
-                        ButtonSegment(value: 'USD', label: Text('\$')),
+                        ButtonSegment(value: 'USD', label: Text(currencySymbol('USD'))),
                       ],
                       selected: {_limitCurrency},
                       onSelectionChanged: (v) =>

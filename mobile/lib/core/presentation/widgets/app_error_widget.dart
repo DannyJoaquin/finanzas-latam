@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'dart:io';
 
 /// Friendly error widget used across all async screens.
 /// Shows a localized Spanish message and an optional retry button.
@@ -30,7 +29,8 @@ class AppErrorWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: theme.colorScheme.error.withOpacity(0.7)),
+            Icon(icon,
+                size: 56, color: theme.colorScheme.error.withOpacity(0.7)),
             const SizedBox(height: 16),
             Text(
               msg,
@@ -64,7 +64,8 @@ class AppErrorWidget extends StatelessWidget {
           return 'No se pudo conectar al servidor. Revisa tu conexión a internet.';
         case DioExceptionType.badResponse:
           final code = error.response?.statusCode;
-          if (code == 401) return 'Tu sesión expiró. Por favor inicia sesión de nuevo.';
+          if (code == 401)
+            return 'Tu sesión expiró. Por favor inicia sesión de nuevo.';
           if (code == 403) return 'No tienes permiso para ver este contenido.';
           if (code == 404) return 'No se encontró la información solicitada.';
           if (code != null && code >= 500) {
@@ -76,9 +77,6 @@ class AppErrorWidget extends StatelessWidget {
         default:
           return 'Error de red desconocido.';
       }
-    }
-    if (error is SocketException) {
-      return 'Sin conexión a internet. Revisa tu red.';
     }
     return 'Algo salió mal. Por favor intenta de nuevo.';
   }
@@ -95,7 +93,6 @@ class AppErrorWidget extends StatelessWidget {
         if (code >= 500) return Icons.cloud_off_outlined;
       }
     }
-    if (error is SocketException) return Icons.wifi_off_outlined;
     return Icons.error_outline;
   }
 }

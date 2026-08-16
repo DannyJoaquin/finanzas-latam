@@ -19,7 +19,25 @@ NumberFormat currencyFmt(String currency) {
       return NumberFormat.currency(locale: 'en_US', symbol: 'C\$ ', decimalDigits: 2);
     case 'HNL':
     default:
-      return NumberFormat.currency(locale: 'en_US', symbol: 'L ', decimalDigits: 0);
+      return NumberFormat.currency(locale: 'en_US', symbol: 'L. ', decimalDigits: 0);
+  }
+}
+
+/// Returns the short symbol used in labels and input prefixes for a currency.
+String currencySymbol(String currency) {
+  switch (currency.toUpperCase()) {
+    case 'USD':
+    case 'MXN':
+      return '\$';
+    case 'GTQ':
+      return 'Q';
+    case 'CRC':
+      return '₡';
+    case 'NIO':
+      return 'C\$';
+    case 'HNL':
+    default:
+      return 'L.';
   }
 }
 

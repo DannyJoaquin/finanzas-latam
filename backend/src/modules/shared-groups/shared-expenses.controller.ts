@@ -21,6 +21,7 @@ import {
   CreateSettlementDto,
   ImportExpenseRowDto,
   UpdateGroupSettingsDto,
+  UpdateSettlementDto,
   UpdateSharedExpenseDto,
 } from './shared-groups.dto';
 
@@ -161,5 +162,25 @@ export class SharedExpensesController {
     @Param('groupId', ParseUUIDPipe) groupId: string,
   ) {
     return this.settlementsService.getGroupSettlements(user.id, groupId);
+  }
+
+  @Patch('settlements/:settlementId')
+  updateSettlement(
+    @CurrentUser() user: User,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('settlementId', ParseUUIDPipe) settlementId: string,
+    @Body() dto: UpdateSettlementDto,
+  ) {
+    return this.settlementsService.updateSettlement(user.id, groupId, settlementId, dto);
+  }
+
+  @Delete('settlements/:settlementId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteSettlement(
+    @CurrentUser() user: User,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('settlementId', ParseUUIDPipe) settlementId: string,
+  ) {
+    return this.settlementsService.removeSettlement(user.id, groupId, settlementId);
   }
 }

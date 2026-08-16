@@ -4,6 +4,7 @@ class StorageKeys {
   // Hive boxes
   static const String preferencesBox = 'preferences';
   static const String cacheBox = 'cache';
+  static const String authBox = 'auth_tokens';
 
   // Secure storage keys
   static const String accessToken = 'access_token';

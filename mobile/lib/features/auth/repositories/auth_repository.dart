@@ -29,7 +29,8 @@ class AuthRepository {
     final meResp = await _dio.get(ApiConstants.me);
     final user = UserModel.fromJson(meResp.data as Map<String, dynamic>);
     await _tokens.saveUser(user.toJson());
-    return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+    return AuthState(
+        isAuthenticated: true, user: user, accessToken: accessToken);
   }
 
   Future<AuthState> register({
@@ -53,14 +54,16 @@ class AuthRepository {
     await _tokens.saveUser(user.toJson());
     // Onboarding is tracked per-user-id (TutorialService), so a brand-new
     // account naturally has no flag yet — nothing to reset here.
-    return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+    return AuthState(
+        isAuthenticated: true, user: user, accessToken: accessToken);
   }
 
   Future<void> logout() async {
     final refreshToken = await _tokens.getRefreshToken();
     if (refreshToken != null) {
       try {
-        await _dio.post(ApiConstants.logout, data: {'refreshToken': refreshToken});
+        await _dio
+            .post(ApiConstants.logout, data: {'refreshToken': refreshToken});
       } catch (_) {}
     }
     await _tokens.clearTokens();
@@ -77,7 +80,8 @@ class AuthRepository {
     final idToken = await GoogleAuthService().signIn();
     if (idToken == null) return null; // user cancelled
 
-    final resp = await _dio.post(ApiConstants.googleAuth, data: {'idToken': idToken});
+    final resp =
+        await _dio.post(ApiConstants.googleAuth, data: {'idToken': idToken});
     final data = resp.data as Map<String, dynamic>;
     final accessToken = data['accessToken'] as String;
     await _tokens.saveTokens(
@@ -90,7 +94,8 @@ class AuthRepository {
       final meResp = await _dio.get(ApiConstants.me);
       final user = UserModel.fromJson(meResp.data as Map<String, dynamic>);
       await _tokens.saveUser(user.toJson());
-      return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+      return AuthState(
+          isAuthenticated: true, user: user, accessToken: accessToken);
     } catch (_) {
       // Fallback: build user from Google response payload
       final user = UserModel(
@@ -100,9 +105,12 @@ class AuthRepository {
         currency: 'HNL',
         payCycle: 'monthly',
         avatarUrl: userJson['avatarUrl'] as String?,
+        hasPassword: false,
+        authProvider: 'google',
       );
       await _tokens.saveUser(user.toJson());
-      return AuthState(isAuthenticated: true, user: user, accessToken: accessToken);
+      return AuthState(
+          isAuthenticated: true, user: user, accessToken: accessToken);
     }
   }
 
@@ -138,5 +146,6 @@ class AuthRepository {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.watch(dioProvider), ref.watch(tokenStorageProvider));
+  return AuthRepository(
+      ref.watch(dioProvider), ref.watch(tokenStorageProvider));
 });

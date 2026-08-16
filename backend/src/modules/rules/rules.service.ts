@@ -1,14 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Rule } from './rule.entity';
+import { Rule, RuleTrigger } from './rule.entity';
 
 export class CreateRuleDto {
+  @IsString()
+  @Length(1, 150)
   name: string;
+
+  @IsEnum(RuleTrigger)
   triggerType: string;
-  conditions: { field: string; op: string; value: unknown }[];
-  actions: { type: string; params: Record<string, unknown> }[];
+
+  @IsArray()
+  conditions: unknown;
+
+  @IsArray()
+  actions: unknown;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
   priority?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 @Injectable()

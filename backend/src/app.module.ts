@@ -12,6 +12,7 @@ import redisConfig from './config/redis.config';
 import jwtConfig from './config/jwt.config';
 import awsConfig from './config/aws.config';
 import googleConfig from './config/google.config';
+import mailConfig from './config/mail.config';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -27,6 +28,7 @@ import { RulesModule } from './modules/rules/rules.module';
 import { CreditCardsModule } from './modules/credit-cards/credit-cards.module';
 import { CategorizationModule } from './modules/categorization/categorization.module';
 import { SharedGroupsModule } from './modules/shared-groups/shared-groups.module';
+import { RecurringExpensesModule } from './modules/recurring-expenses/recurring-expenses.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 
 // Jobs
@@ -58,7 +60,15 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
     // ── Config ────────────────────────────────────────────────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, jwtConfig, awsConfig, googleConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        jwtConfig,
+        awsConfig,
+        googleConfig,
+        mailConfig,
+      ],
     }),
 
     // ── Database ──────────────────────────────────────────────────────────
@@ -116,6 +126,7 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
     CreditCardsModule,
     CategorizationModule,
     SharedGroupsModule,
+    RecurringExpensesModule,
   ],
   providers: [
     // Global JWT guard — all routes require auth unless @Public()

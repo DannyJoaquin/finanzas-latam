@@ -33,6 +33,33 @@ class SharedSettlementsRepository {
     });
     return SharedSettlementModel.fromJson(resp.data as Map<String, dynamic>);
   }
+
+  Future<SharedSettlementModel> updateSettlement({
+    required String groupId,
+    required String settlementId,
+    required double amount,
+    required String date,
+    required String paymentMethod,
+    required String note,
+  }) async {
+    final resp = await _dio.patch(
+      ApiConstants.sharedGroupSettlement(groupId, settlementId),
+      data: {
+        'amount': amount,
+        'date': date,
+        'paymentMethod': paymentMethod,
+        'note': note,
+      },
+    );
+    return SharedSettlementModel.fromJson(resp.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteSettlement({
+    required String groupId,
+    required String settlementId,
+  }) async {
+    await _dio.delete(ApiConstants.sharedGroupSettlement(groupId, settlementId));
+  }
 }
 
 final sharedSettlementsRepositoryProvider = Provider<SharedSettlementsRepository>((ref) {

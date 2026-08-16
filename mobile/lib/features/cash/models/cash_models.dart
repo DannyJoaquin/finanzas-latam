@@ -35,6 +35,7 @@ class CashTransactionModel {
     required this.amount,
     required this.description,
     required this.date,
+    this.expenseId,
   });
 
   final String id;
@@ -42,6 +43,7 @@ class CashTransactionModel {
   final double amount;
   final String description;
   final String date;
+  final String? expenseId;
 
   factory CashTransactionModel.fromJson(Map<String, dynamic> j) =>
       CashTransactionModel(
@@ -51,5 +53,6 @@ class CashTransactionModel {
         description: j['description'] as String? ?? '',
         date: (j['date'] as String? ?? '').substring(
             0, (j['date'] as String? ?? '').length.clamp(0, 10)),
+          expenseId: j['expenseId'] as String?,
       );
 }

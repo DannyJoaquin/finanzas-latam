@@ -6,11 +6,13 @@ import { ExpensesService } from './expenses.service';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CashTransaction } from '../cash/cash-transaction.entity';
 import { CategorizationModule } from '../categorization/categorization.module';
+import { RulesModule } from '../rules/rules.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Expense, CashAccount, CashTransaction]),
     CategorizationModule,
+    RulesModule,
   ],
   controllers: [ExpensesController],
   providers: [ExpensesService],

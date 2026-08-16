@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/constants/currency_format.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 import '../../models/cash_models.dart';
 import '../../providers/cash_provider.dart';
 
@@ -59,7 +63,7 @@ class _EmptyStateState extends ConsumerState<_EmptyState> {
       final dio = ref.read(dioProvider);
       await dio.post(ApiConstants.cashAccounts, data: {
         'name': 'Mi cartera',
-        'currency': 'HNL',
+        'currency': ref.read(currencyProvider),
       });
       widget.onCreated();
     } catch (e) {
@@ -131,7 +135,7 @@ class _AccountView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final txAsync = ref.watch(cashTransactionsProvider(account.id));
-    final fmt = NumberFormat.currency(locale: 'en_US', symbol: '${account.currency} ');
+    final fmt = currencyFmt(account.currency);
     final theme = Theme.of(context);
 
     return RefreshIndicator(
@@ -215,7 +219,16 @@ class _AccountView extends ConsumerWidget {
               }
               return Column(
                 children: transactions.take(50).map((tx) {
-                  return _TransactionTile(tx: tx, currency: account.currency);
+                  final canEdit = tx.type == 'deposit' || tx.type == 'withdraw';
+                  return _TransactionTile(
+                    tx: tx,
+                    currency: account.currency,
+                    onTap: tx.type == 'spend'
+                        ? () => context.go(AppRoutes.expenses)
+                        : canEdit
+                            ? () => _showTransactionEditor(context, ref, account, tx)
+                            : null,
+                  );
                 }).toList(),
               );
             },
@@ -237,6 +250,26 @@ class _AccountView extends ConsumerWidget {
       builder: (_) => _OperationSheet(
         account: account,
         operation: operation,
+        onDone: () {
+          ref.invalidate(cashAccountsProvider);
+          ref.invalidate(cashTransactionsProvider(account.id));
+        },
+      ),
+    );
+  }
+
+  void _showTransactionEditor(
+    BuildContext context,
+    WidgetRef ref,
+    CashAccountModel account,
+    CashTransactionModel transaction,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EditTransactionSheet(
+        account: account,
+        transaction: transaction,
         onDone: () {
           ref.invalidate(cashAccountsProvider);
           ref.invalidate(cashTransactionsProvider(account.id));
@@ -331,9 +364,10 @@ class _WalletCard extends StatelessWidget {
 // ── Transaction tile ──────────────────────────────────────────────────────────
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.tx, required this.currency});
+  const _TransactionTile({required this.tx, required this.currency, this.onTap});
   final CashTransactionModel tx;
   final String currency;
+  final VoidCallback? onTap;
 
   bool get _isCredit =>
       tx.type == 'deposit' || tx.type == 'receive_transfer';
@@ -363,8 +397,7 @@ class _TransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _isCredit ? AppColors.income : AppColors.expense;
-    final fmt =
-        NumberFormat.currency(locale: 'en_US', symbol: '$currency ');
+    final fmt = currencyFmt(currency);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -379,10 +412,15 @@ class _TransactionTile extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
             Container(
               width: 40,
               height: 40,
@@ -419,7 +457,9 @@ class _TransactionTile extends StatelessWidget {
                 fontSize: 14,
               ),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -521,8 +561,9 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
               controller: _amountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Monto (${widget.account.currency})',
-                prefixIcon: const Icon(Icons.attach_money),
+                labelText: 'Monto (${currencySymbol(widget.account.currency)})',
+                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                prefixText: '${currencySymbol(widget.account.currency)} ',
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Requerido';
@@ -552,6 +593,223 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
                   : Text(title),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditTransactionSheet extends ConsumerStatefulWidget {
+  const _EditTransactionSheet({
+    required this.account,
+    required this.transaction,
+    required this.onDone,
+  });
+
+  final CashAccountModel account;
+  final CashTransactionModel transaction;
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<_EditTransactionSheet> createState() => _EditTransactionSheetState();
+}
+
+class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _amountCtrl;
+  late final TextEditingController _descriptionCtrl;
+  late DateTime _date;
+  bool _saving = false;
+  bool _deleting = false;
+
+  bool get _isDeposit => widget.transaction.type == 'deposit';
+
+  @override
+  void initState() {
+    super.initState();
+    _amountCtrl = TextEditingController(
+      text: widget.transaction.amount.toStringAsFixed(2),
+    );
+    _descriptionCtrl = TextEditingController(text: widget.transaction.description);
+    _date = DateTime.tryParse(widget.transaction.date) ?? DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: 'Fecha del movimiento',
+    );
+    if (picked != null && mounted) setState(() => _date = picked);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.patch(
+        ApiConstants.cashTransaction(widget.account.id, widget.transaction.id),
+        data: {
+          'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+          'description': _descriptionCtrl.text.trim(),
+          'date': _date.toIso8601String().split('T').first,
+        },
+      );
+      widget.onDone();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Movimiento actualizado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_isDeposit ? 'Eliminar depósito' : 'Eliminar retiro'),
+        content: const Text('El saldo de efectivo se recalculará.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _deleting = true);
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete(
+        ApiConstants.cashTransaction(widget.account.id, widget.transaction.id),
+      );
+      widget.onDone();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Movimiento eliminado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final busy = _saving || _deleting;
+    final title = _isDeposit ? 'Editar depósito' : 'Editar retiro';
+    final dateLabel = DateFormat('dd/MM/yyyy').format(_date);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 24),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  IconButton(
+                    tooltip: 'Eliminar movimiento',
+                    onPressed: busy ? null : _delete,
+                    icon: _deleting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline, color: Colors.red),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Monto (${currencySymbol(widget.account.currency)})',
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                  prefixText: '${currencySymbol(widget.account.currency)} ',
+                ),
+                validator: (value) {
+                  final amount = double.tryParse(value?.replaceAll(',', '.') ?? '');
+                  if (amount == null || amount <= 0) return 'Monto inválido';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descriptionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+                maxLength: 255,
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(12),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Fecha',
+                    prefixIcon: Icon(Icons.calendar_month_outlined),
+                  ),
+                  child: Text(dateLabel),
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: busy ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Guardar cambios'),
+              ),
+            ],
+          ),
         ),
       ),
     );

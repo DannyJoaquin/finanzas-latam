@@ -9,6 +9,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../providers/expenses_provider.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/constants/currency_format.dart';
 import '../../../../features/credit_cards/providers/credit_cards_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/home/providers/dashboard_provider.dart';
@@ -228,7 +229,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
                             labelText: 'Monto',
-                            prefixText: _currency! == 'USD' ? '\$ ' : 'L ',
+                            prefixText: '${currencySymbol(_currency!)} ',
                           ),
                           validator: (v) {
                             if (v == null || v.isEmpty) return 'Requerido';
@@ -242,9 +243,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: SegmentedButton<String>(
-                          segments: const [
+                          segments: [
                             ButtonSegment(value: 'HNL', label: Text('L')),
-                            ButtonSegment(value: 'USD', label: Text('\$')),
+                            ButtonSegment(value: 'USD', label: Text(currencySymbol('USD'))),
                           ],
                           selected: {_currency!},
                           onSelectionChanged: (s) => setState(() => _currency = s.first),

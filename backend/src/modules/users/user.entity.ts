@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { Income } from '../incomes/income.entity';
 import { Expense } from '../expenses/expense.entity';
 import { Category } from '../categories/category.entity';
@@ -99,6 +99,16 @@ export class User {
 
   @Column({ name: 'provider_id', type: 'varchar', length: 255, nullable: true })
   providerId: string | null;
+
+  @Expose()
+  get hasPassword(): boolean {
+    return Boolean(this.passwordHash);
+  }
+
+  @Expose()
+  get authProvider(): string {
+    return this.provider ?? 'local';
+  }
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

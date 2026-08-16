@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 
 class BudgetModel {
   const BudgetModel({
@@ -499,7 +500,10 @@ class _AddBudgetSheetState extends ConsumerState<_AddBudgetSheet> {
               TextFormField(
                 controller: _amountCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Límite', prefixText: 'L '),
+                decoration: InputDecoration(
+                  labelText: 'Límite',
+                  prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
+                ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Requerido';
                   if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Número inválido';
@@ -731,7 +735,10 @@ class _EditBudgetSheetState extends ConsumerState<_EditBudgetSheet> {
               TextFormField(
                 controller: _amountCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Límite', prefixText: 'L '),
+                decoration: InputDecoration(
+                  labelText: 'Límite',
+                  prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
+                ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Requerido';
                   if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Número inválido';

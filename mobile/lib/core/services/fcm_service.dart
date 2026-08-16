@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -28,7 +29,9 @@ class FcmService {
     if (_initialized) return;
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      if (!kIsWeb) {
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
+      }
 
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
@@ -63,7 +66,10 @@ class FcmService {
   /// Returns null when Firebase is not configured.
   Future<String?> _getToken() async {
     try {
-      return await FirebaseMessaging.instance.getToken();
+      const vapidKey = String.fromEnvironment('FIREBASE_WEB_VAPID_KEY');
+      return await FirebaseMessaging.instance.getToken(
+        vapidKey: vapidKey.isEmpty ? null : vapidKey,
+      );
     } catch (_) {
       // Firebase not configured or unavailable in current runtime.
       return null;
@@ -88,7 +94,8 @@ class FcmService {
   }
 
   int _notificationId(RemoteMessage message) {
-    final source = message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final source =
+        message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString();
     return source.hashCode & 0x7fffffff;
   }
 

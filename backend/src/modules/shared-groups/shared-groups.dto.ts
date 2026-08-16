@@ -252,3 +252,23 @@ export class CreateSettlementDto {
   @IsUUID()
   receiverCashAccountId?: string;
 }
+
+export class UpdateSettlementDto {
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  amount?: number;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsEnum(SharedSettlementPaymentMethod)
+  paymentMethod?: SharedSettlementPaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 300)
+  note?: string;
+}

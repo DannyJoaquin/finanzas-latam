@@ -12,6 +12,7 @@ import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { CashAccount } from '../cash/cash-account.entity';
 import { CreditCard } from '../credit-cards/credit-card.entity';
+import { RecurringExpense } from '../recurring-expenses/recurring-expense.entity';
 
 export enum PaymentMethod {
   CASH = 'cash',
@@ -33,6 +34,7 @@ export enum ExpenseSource {
 @Index('idx_expenses_user_date', ['userId', 'date'])
 @Index('idx_expenses_category', ['categoryId'])
 @Index('idx_expenses_method', ['userId', 'paymentMethod'])
+@Index('uq_expenses_recurring_schedule', ['recurringExpenseId', 'recurringScheduledDate'], { unique: true })
 @Entity('expenses')
 export class Expense {
   @PrimaryGeneratedColumn('uuid')
@@ -103,6 +105,19 @@ export class Expense {
   @ManyToOne(() => CreditCard, { nullable: true })
   @JoinColumn({ name: 'credit_card_id' })
   creditCard: CreditCard | null;
+
+  @Column({ name: 'recurring_expense_id', nullable: true })
+  recurringExpenseId: string | null;
+
+  @ManyToOne(() => RecurringExpense, (recurring) => recurring.expenses, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'recurring_expense_id' })
+  recurringExpense: RecurringExpense | null;
+
+  @Column({ name: 'recurring_scheduled_date', type: 'date', nullable: true })
+  recurringScheduledDate: Date | null;
 
   @Column({ type: 'enum', enum: ExpenseSource, default: ExpenseSource.MANUAL })
   source: ExpenseSource;

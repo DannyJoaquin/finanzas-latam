@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 
 class GoalModel {
   const GoalModel({
@@ -376,7 +377,10 @@ class GoalsScreen extends ConsumerWidget {
         content: TextField(
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Monto', prefixText: 'L '),
+          decoration: InputDecoration(
+            labelText: 'Monto',
+            prefixText: '${currencySymbol(ref.read(currencyProvider))} ',
+          ),
           autofocus: true,
         ),
         actions: [
@@ -617,7 +621,10 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
             TextFormField(
               controller: _amountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Monto objetivo', prefixText: 'L '),
+              decoration: InputDecoration(
+                labelText: 'Monto objetivo',
+                prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
+              ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requerido';
                 if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Número inválido';

@@ -11,6 +11,7 @@ import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/providers/experience_provider.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ class _ExpenseFilter {
   final DateTime? startDate;
   final DateTime? endDate;
   final String? paymentMethod;
+
   /// When set, filters the entire calendar month (overrides start/end).
   final DateTime? selectedMonth;
   final String? selectedCategoryId;
@@ -53,8 +55,9 @@ class _ExpenseFilter {
       endDate: clearEnd ? null : (endDate ?? this.endDate),
       paymentMethod: clearMethod ? null : (paymentMethod ?? this.paymentMethod),
       selectedMonth: clearMonth ? null : (selectedMonth ?? this.selectedMonth),
-      selectedCategoryId:
-          clearCategory ? null : (selectedCategoryId ?? this.selectedCategoryId),
+      selectedCategoryId: clearCategory
+          ? null
+          : (selectedCategoryId ?? this.selectedCategoryId),
     );
   }
 }
@@ -96,6 +99,28 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
         automaticallyImplyLeading: false,
         title: const SizedBox.shrink(),
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).shadowColor.withAlpha(14),
+                  blurRadius: 20,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: IconButton(
+              iconSize: 20,
+              icon: const Icon(Icons.autorenew_rounded),
+              tooltip: 'Gastos recurrentes',
+              onPressed: _busy
+                  ? null
+                  : () => context.push(AppRoutes.recurringExpenses),
+            ),
+          ),
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -138,7 +163,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
       ),
       body: expAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(expensesProvider)),
+        error: (e, _) => AppErrorWidget(
+            error: e, onRetry: () => ref.invalidate(expensesProvider)),
         data: (expenses) {
           // Apply filter
           var filtered = expenses;
@@ -151,7 +177,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
           } else {
             if (filter.startDate != null) {
               filtered = filtered
-                  .where((e) => !DateTime.parse(e.date).isBefore(filter.startDate!))
+                  .where((e) =>
+                      !DateTime.parse(e.date).isBefore(filter.startDate!))
                   .toList();
             }
             if (filter.endDate != null) {
@@ -162,7 +189,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
             }
           }
           if (filter.paymentMethod != null) {
-            filtered = filtered.where((e) => e.paymentMethod == filter.paymentMethod).toList();
+            filtered = filtered
+                .where((e) => e.paymentMethod == filter.paymentMethod)
+                .toList();
           }
 
           final categorySource = [...filtered];
@@ -170,16 +199,19 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
             filtered = filtered
                 .where((e) =>
                     e.categoryId == filter.selectedCategoryId ||
-                    (e.categoryId == null && e.categoryName == filter.selectedCategoryId))
+                    (e.categoryId == null &&
+                        e.categoryName == filter.selectedCategoryId))
                 .toList();
           }
 
           // Sort descending
-          final sorted = [...filtered]..sort((a, b) => b.date.compareTo(a.date));
+          final sorted = [...filtered]
+            ..sort((a, b) => b.date.compareTo(a.date));
           final totalFiltered = _CurrencyTotals.fromExpenses(sorted);
           final now = DateTime.now();
           final monthLabel = DateFormat('MMMM yyyy', 'es').format(now);
-          final monthTitle = monthLabel[0].toUpperCase() + monthLabel.substring(1);
+          final monthTitle =
+              monthLabel[0].toUpperCase() + monthLabel.substring(1);
 
           final byCategory = <String, _CategoryChipData>{};
           for (final e in categorySource) {
@@ -201,7 +233,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
           final Map<String, _CurrencyTotals> monthTotals = {};
           for (final e in sorted) {
             final key = DateFormat('yyyy-MM').format(DateTime.parse(e.date));
-            monthTotals[key] = (monthTotals[key] ?? const _CurrencyTotals()).addExpense(e);
+            monthTotals[key] =
+                (monthTotals[key] ?? const _CurrencyTotals()).addExpense(e);
           }
           String? lastMonthKey;
           for (final e in sorted) {
@@ -225,13 +258,17 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                   Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
                   Text(
-                    filter.isActive ? 'Sin resultados para este filtro' : 'No hay gastos registrados',
+                    filter.isActive
+                        ? 'Sin resultados para este filtro'
+                        : 'No hay gastos registrados',
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                   if (filter.isActive) ...[
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () => ref.read(_expensesFilterProvider.notifier).state = const _ExpenseFilter(),
+                      onPressed: () => ref
+                          .read(_expensesFilterProvider.notifier)
+                          .state = const _ExpenseFilter(),
                       child: const Text('Limpiar filtros'),
                     ),
                   ],
@@ -252,7 +289,10 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       children: [
                         Text(
                           'Gastos',
-                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineLarge
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                         ),
@@ -262,18 +302,24 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                         ),
                         const SizedBox(height: 12),
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Theme.of(context).shadowColor.withAlpha(14),
+                                color:
+                                    Theme.of(context).shadowColor.withAlpha(14),
                                 blurRadius: 20,
                                 offset: const Offset(0, 7),
                               ),
@@ -287,82 +333,103 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium
-                                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                    ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 _formatMixedTotal(totalFiltered),
                                 style: (isSimple
-                                        ? Theme.of(context).textTheme.headlineLarge
-                                        : Theme.of(context).textTheme.headlineMedium)
+                                        ? Theme.of(context)
+                                            .textTheme
+                                            .headlineLarge
+                                        : Theme.of(context)
+                                            .textTheme
+                                            .headlineMedium)
                                     ?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.expense,
-                                    ),
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.expense,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 12),
                         if (!isSimple)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: const Text('Todos'),
-                                  showCheckmark: false,
-                                  side: BorderSide.none,
-                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-                                  selectedColor: colorScheme.primary.withAlpha(24),
-                                  labelStyle: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: filter.selectedCategoryId == null
-                                        ? colorScheme.primary
-                                        : colorScheme.onSurfaceVariant,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  selected: filter.selectedCategoryId == null,
-                                  onSelected: (_) {
-                                    ref.read(_expensesFilterProvider.notifier).state =
-                                        filter.copyWith(clearCategory: true);
-                                  },
-                                ),
-                              ),
-                              ...categoryChips.take(6).map((cat) {
-                                final selected = filter.selectedCategoryId == cat.id;
-                                return Padding(
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: ChoiceChip(
-                                    label: Text(cat.name),
+                                    label: const Text('Todos'),
                                     showCheckmark: false,
                                     side: BorderSide.none,
-                                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-                                    selectedColor: colorScheme.primary.withAlpha(24),
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerLow,
+                                    selectedColor:
+                                        colorScheme.primary.withAlpha(24),
                                     labelStyle: TextStyle(
                                       fontWeight: FontWeight.w600,
-                                      color: selected
+                                      color: filter.selectedCategoryId == null
                                           ? colorScheme.primary
                                           : colorScheme.onSurfaceVariant,
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
-                                    selected: selected,
+                                    selected: filter.selectedCategoryId == null,
                                     onSelected: (_) {
-                                      ref.read(_expensesFilterProvider.notifier).state =
-                                          filter.copyWith(selectedCategoryId: cat.id);
+                                      ref
+                                              .read(_expensesFilterProvider
+                                                  .notifier)
+                                              .state =
+                                          filter.copyWith(clearCategory: true);
                                     },
                                   ),
-                                );
-                              }),
-                            ],
+                                ),
+                                ...categoryChips.take(6).map((cat) {
+                                  final selected =
+                                      filter.selectedCategoryId == cat.id;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(cat.name),
+                                      showCheckmark: false,
+                                      side: BorderSide.none,
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerLow,
+                                      selectedColor:
+                                          colorScheme.primary.withAlpha(24),
+                                      labelStyle: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: selected
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      selected: selected,
+                                      onSelected: (_) {
+                                        ref
+                                                .read(_expensesFilterProvider
+                                                    .notifier)
+                                                .state =
+                                            filter.copyWith(
+                                                selectedCategoryId: cat.id);
+                                      },
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -380,16 +447,23 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             children: [
                               Text(
                                 item.label,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
                                     ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Divider(
                                   thickness: 1,
-                                  color: Theme.of(context).colorScheme.primary.withAlpha(50),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withAlpha(50),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -411,17 +485,18 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       final isEmoji = e.categoryIcon.runes.any((r) => r > 127);
                       final iconSize = isSimple ? 62.0 : 52.0;
                       final itemRadius = isSimple ? 24.0 : 22.0;
-                      final itemColor = e.isShared
-                          ? Colors.teal.shade600
-                          : AppColors.expense;
+                      final itemColor =
+                          e.isShared ? Colors.teal.shade600 : AppColors.expense;
                       return Padding(
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, isSimple ? 16 : 14),
+                        padding:
+                            EdgeInsets.fromLTRB(16, 0, 16, isSimple ? 16 : 14),
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(itemRadius),
                             boxShadow: [
                               BoxShadow(
-                                color: Theme.of(context).shadowColor.withAlpha(14),
+                                color:
+                                    Theme.of(context).shadowColor.withAlpha(14),
                                 blurRadius: 20,
                                 offset: const Offset(0, 6),
                               ),
@@ -430,15 +505,20 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                           child: _AnimatedItemEntry(
                             index: i,
                             child: Material(
-                              color: Theme.of(context).colorScheme.surfaceContainerLow,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLow,
                               borderRadius: BorderRadius.circular(itemRadius),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(itemRadius),
                                 onTap: _busy
                                     ? null
                                     : e.isShared && e.groupId != null
-                                        ? () => context.push(AppRoutes.sharedGroupDetail(e.groupId!))
-                                        : () => _showExpenseActionsSheet(context, e),
+                                        ? () => context.push(
+                                            AppRoutes.sharedGroupDetail(
+                                                e.groupId!))
+                                        : () => _showExpenseActionsSheet(
+                                            context, e),
                                 child: Padding(
                                   padding: EdgeInsets.symmetric(
                                       horizontal: isSimple ? 20 : 14,
@@ -450,14 +530,18 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                         height: iconSize,
                                         decoration: BoxDecoration(
                                           color: itemColor.withAlpha(20),
-                                          borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
+                                          borderRadius: BorderRadius.circular(
+                                              isSimple ? 18 : 16),
                                         ),
                                         alignment: Alignment.center,
                                         child: isEmoji
                                             ? Text(e.categoryIcon,
-                                                style: TextStyle(fontSize: isSimple ? 30 : 24))
+                                                style: TextStyle(
+                                                    fontSize:
+                                                        isSimple ? 30 : 24))
                                             : Icon(
-                                                materialIconFromString(e.categoryIcon),
+                                                materialIconFromString(
+                                                    e.categoryIcon),
                                                 size: isSimple ? 30 : 24,
                                                 color: itemColor,
                                               ),
@@ -465,10 +549,13 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              e.description.isEmpty ? e.categoryName : e.description,
+                                              e.description.isEmpty
+                                                  ? e.categoryName
+                                                  : e.description,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
@@ -477,21 +564,50 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                               ),
                                             ),
                                             const SizedBox(height: 2),
-                                            Text(
-                                              e.isShared
-                                                  ? '${e.groupName ?? 'Compartido'} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}'
-                                                  : '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}',
-                                              style: TextStyle(
-                                                fontSize: isSimple ? 14 : 12,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    e.isShared
+                                                        ? '${e.groupName ?? 'Compartido'} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}'
+                                                        : '${e.categoryName} · ${DateFormat('dd MMM', 'es').format(DateTime.parse(e.date))}${e.isRecurring ? ' · Recurrente' : ''}',
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          isSimple ? 14 : 12,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                _PaymentMethodIndicator(
+                                                  method: e.paymentMethod,
+                                                  compact: isSimple,
+                                                ),
+                                              ],
                                             ),
+                                            if (e.isShared) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Gasto compartido',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.teal.shade600,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
                                         children: [
                                           Text(
                                             '-${currencyFmt(e.currency).format(e.amount)}',
@@ -536,7 +652,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     );
   }
 
-  Future<void> _showEditSheet(BuildContext context, ExpenseModel expense) async {
+  Future<void> _showEditSheet(
+      BuildContext context, ExpenseModel expense) async {
     if (_busy) return;
     setState(() => _busy = true);
     await showModalBottomSheet(
@@ -553,7 +670,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _showExpenseActionsSheet(BuildContext context, ExpenseModel expense) async {
+  Future<void> _showExpenseActionsSheet(
+      BuildContext context, ExpenseModel expense) async {
     if (_busy) return;
     await showModalBottomSheet(
       context: context,
@@ -573,8 +691,10 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
-              title: const Text('Eliminar gasto', style: TextStyle(color: AppColors.expense)),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar gasto',
+                  style: TextStyle(color: AppColors.expense)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteExpense(context, expense);
@@ -587,14 +707,18 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     );
   }
 
-  Future<void> _confirmDeleteExpense(BuildContext context, ExpenseModel expense) async {
+  Future<void> _confirmDeleteExpense(
+      BuildContext context, ExpenseModel expense) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar gasto'),
-        content: const Text('¿Deseas eliminar este gasto? Esta acción no se puede deshacer.'),
+        content: const Text(
+            '¿Deseas eliminar este gasto? Esta acción no se puede deshacer.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -628,7 +752,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
     DateTime? tmpEnd = ref.read(_expensesFilterProvider).endDate;
     String? tmpMethod = ref.read(_expensesFilterProvider).paymentMethod;
     DateTime? tmpMonth = ref.read(_expensesFilterProvider).selectedMonth;
-    String? tmpCategoryId = ref.read(_expensesFilterProvider).selectedCategoryId;
+    String? tmpCategoryId =
+        ref.read(_expensesFilterProvider).selectedCategoryId;
 
     const payMethods = <String, String>{
       'cash': 'Efectivo',
@@ -646,14 +771,19 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
-          padding: EdgeInsets.fromLTRB(24, 20, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.fromLTRB(
+              24, 20, 24, 24 + MediaQuery.of(ctx).viewInsets.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  Text('Filtrar gastos', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  Text('Filtrar gastos',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
                   const Spacer(),
                   TextButton(
                     onPressed: () {
@@ -676,7 +806,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
               Builder(builder: (_) {
                 final now = DateTime.now();
                 final mFmt = DateFormat('MMM yyyy', 'es');
-                final months = List.generate(6, (i) => DateTime(now.year, now.month - i, 1));
+                final months = List.generate(
+                    6, (i) => DateTime(now.year, now.month - i, 1));
                 return Wrap(
                   spacing: 8,
                   runSpacing: 4,
@@ -691,7 +822,10 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       selected: selected,
                       onSelected: (v) => setState(() {
                         tmpMonth = v ? m : null;
-                        if (v) { tmpStart = null; tmpEnd = null; }
+                        if (v) {
+                          tmpStart = null;
+                          tmpEnd = null;
+                        }
                       }),
                     );
                   }).toList(),
@@ -699,11 +833,14 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
               }),
               const SizedBox(height: 16),
               // ── Custom date range ───────────────────────────────────────
-              Text('Rango personalizado', style: Theme.of(ctx).textTheme.labelLarge),
+              Text('Rango personalizado',
+                  style: Theme.of(ctx).textTheme.labelLarge),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today, size: 18),
-                label: Text(tmpStart != null ? 'Desde: ${dFmt.format(tmpStart!)}' : 'Desde (fecha inicial)'),
+                label: Text(tmpStart != null
+                    ? 'Desde: ${dFmt.format(tmpStart!)}'
+                    : 'Desde (fecha inicial)'),
                 onPressed: () async {
                   final picked = await showDatePicker(
                     context: ctx,
@@ -711,13 +848,19 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime.now(),
                   );
-                  if (picked != null) setState(() { tmpStart = picked; tmpMonth = null; });
+                  if (picked != null)
+                    setState(() {
+                      tmpStart = picked;
+                      tmpMonth = null;
+                    });
                 },
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today, size: 18),
-                label: Text(tmpEnd != null ? 'Hasta: ${dFmt.format(tmpEnd!)}' : 'Hasta (fecha final)'),
+                label: Text(tmpEnd != null
+                    ? 'Hasta: ${dFmt.format(tmpEnd!)}'
+                    : 'Hasta (fecha final)'),
                 onPressed: () async {
                   final picked = await showDatePicker(
                     context: ctx,
@@ -725,7 +868,11 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                     firstDate: tmpStart ?? DateTime(2020),
                     lastDate: DateTime.now(),
                   );
-                  if (picked != null) setState(() { tmpEnd = picked; tmpMonth = null; });
+                  if (picked != null)
+                    setState(() {
+                      tmpEnd = picked;
+                      tmpMonth = null;
+                    });
                 },
               ),
               const SizedBox(height: 16),
@@ -739,14 +886,16 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                   return FilterChip(
                     label: Text(entry.value),
                     selected: selected,
-                    onSelected: (v) => setState(() => tmpMethod = v ? entry.key : null),
+                    onSelected: (v) =>
+                        setState(() => tmpMethod = v ? entry.key : null),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () {
-                  ref.read(_expensesFilterProvider.notifier).state = _ExpenseFilter(
+                  ref.read(_expensesFilterProvider.notifier).state =
+                      _ExpenseFilter(
                     startDate: tmpMonth != null ? null : tmpStart,
                     endDate: tmpMonth != null ? null : tmpEnd,
                     paymentMethod: tmpMethod,
@@ -813,6 +962,82 @@ class _MonthHeader {
   final _CurrencyTotals totals;
 }
 
+class _PaymentMethodIndicator extends StatelessWidget {
+  const _PaymentMethodIndicator({required this.method, this.compact = false});
+
+  final String method;
+  final bool compact;
+
+  ({IconData icon, String label, Color color}) _style(BuildContext context) {
+    final theme = Theme.of(context);
+    return switch (method) {
+      'cash' => (
+          icon: Icons.account_balance_wallet_outlined,
+          label: 'Efectivo',
+          color: Colors.green.shade700,
+        ),
+      'card_credit' => (
+          icon: Icons.credit_card_outlined,
+          label: 'Crédito',
+          color: Colors.orange.shade700,
+        ),
+      'card_debit' => (
+          icon: Icons.credit_card_outlined,
+          label: 'Débito',
+          color: theme.colorScheme.primary,
+        ),
+      'transfer' => (
+          icon: Icons.swap_horiz_rounded,
+          label: 'Transferencia',
+          color: Colors.deepPurple.shade400,
+        ),
+      _ => (
+          icon: Icons.receipt_long_outlined,
+          label: 'Otro',
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _style(context);
+    final background = style.color.withAlpha(22);
+
+    return Tooltip(
+      message: 'Pagado con ${style.label}',
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 6 : 7,
+          vertical: 3,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: style.color.withAlpha(65)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(style.icon, size: compact ? 13 : 12, color: style.color),
+            if (!compact) ...[
+              const SizedBox(width: 4),
+              Text(
+                style.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: style.color,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CurrencyTotals {
   const _CurrencyTotals({this.hnl = 0, this.usd = 0});
 
@@ -853,7 +1078,8 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
   late final _amountCtrl = TextEditingController(
     text: widget.expense.amount.toStringAsFixed(2),
   );
-  late final _descCtrl = TextEditingController(text: widget.expense.description);
+  late final _descCtrl =
+      TextEditingController(text: widget.expense.description);
   late String? _selectedCategoryId = widget.expense.categoryId;
   late String _paymentMethod = widget.expense.paymentMethod;
   late DateTime _date = DateTime.parse(widget.expense.date);
@@ -889,8 +1115,8 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Selecciona una categoría')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecciona una categoría')));
       return;
     }
     setState(() => _saving = true);
@@ -925,9 +1151,12 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar gasto'),
-        content: const Text('¿Deseas eliminar este gasto? Esta acción no se puede deshacer.'),
+        content: const Text(
+            '¿Deseas eliminar este gasto? Esta acción no se puede deshacer.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -973,11 +1202,15 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
             children: [
               Row(
                 children: [
-                  Text('Editar gasto', style: Theme.of(context).textTheme.titleLarge),
+                  Text('Editar gasto',
+                      style: Theme.of(context).textTheme.titleLarge),
                   const Spacer(),
                   IconButton(
                     icon: _deleting
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.delete_outline, color: Colors.red),
                     tooltip: 'Eliminar',
                     onPressed: busy ? null : _delete,
@@ -987,9 +1220,13 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Monto', prefixText: 'L '),
+                decoration: InputDecoration(
+                  labelText: 'Monto',
+                  prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
+                ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Requerido';
                   final n = double.tryParse(v.replaceAll(',', '.'));
@@ -1002,7 +1239,8 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                 controller: _descCtrl,
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+                decoration:
+                    const InputDecoration(labelText: 'Descripción (opcional)'),
               ),
               const SizedBox(height: 16),
               catAsync.when(
@@ -1017,20 +1255,27 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                     value: validId,
                     decoration: const InputDecoration(labelText: 'Categoría'),
                     isExpanded: true,
-                    items: cats.map((c) => DropdownMenuItem(
-                      value: c.id,
-                      child: Row(
-                        children: [
-                          Icon(c.iconData, size: 18),
-                          const SizedBox(width: 8),
-                          Flexible(child: Text(
-                            c.parentName != null ? '${c.parentName} › ${c.name}' : c.name,
-                            overflow: TextOverflow.ellipsis,
-                          )),
-                        ],
-                      ),
-                    )).toList(),
-                    onChanged: busy ? null : (v) => setState(() => _selectedCategoryId = v),
+                    items: cats
+                        .map((c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Row(
+                                children: [
+                                  Icon(c.iconData, size: 18),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                      child: Text(
+                                    c.parentName != null
+                                        ? '${c.parentName} › ${c.name}'
+                                        : c.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: busy
+                        ? null
+                        : (v) => setState(() => _selectedCategoryId = v),
                     validator: (v) => v == null ? 'Requerido' : null,
                   );
                 },
@@ -1040,9 +1285,12 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                 initialValue: _paymentMethod,
                 decoration: const InputDecoration(labelText: 'Método de pago'),
                 items: _payMethods.entries
-                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .map((e) =>
+                        DropdownMenuItem(value: e.key, child: Text(e.value)))
                     .toList(),
-                onChanged: busy ? null : (v) => setState(() => _paymentMethod = v ?? 'cash'),
+                onChanged: busy
+                    ? null
+                    : (v) => setState(() => _paymentMethod = v ?? 'cash'),
               ),
               const SizedBox(height: 16),
               ListTile(
@@ -1056,7 +1304,11 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
               FilledButton(
                 onPressed: busy ? null : _save,
                 child: _saving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : const Text('Guardar cambios'),
               ),
             ],

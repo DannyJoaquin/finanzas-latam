@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConstants {
   const ApiConstants._();
 
-  static const String baseUrl =
-      String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:3000/api/v1');
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue:
+        kIsWeb ? 'http://localhost:3000/api/v1' : 'http://10.0.2.2:3000/api/v1',
+  );
 
   // Auth
   static const String register = '/auth/register';
@@ -10,6 +15,9 @@ class ApiConstants {
   static const String refresh = '/auth/refresh';
   static const String logout = '/auth/logout';
   static const String googleAuth = '/auth/google';
+  static const String changePassword = '/auth/password';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
   static const String me = '/users/me';
 
   // Categories
@@ -18,6 +26,8 @@ class ApiConstants {
   // Expenses
   static const String expenses = '/expenses';
   static const String expensesSummary = '/expenses/summary';
+  static const String recurringExpenses = '/recurring-expenses';
+  static String recurringExpense(String id) => '$recurringExpenses/$id';
 
   // Incomes
   static const String incomes = '/incomes';
@@ -28,6 +38,8 @@ class ApiConstants {
 
   // Cash
   static const String cashAccounts = '/cash/accounts';
+  static String cashTransaction(String accountId, String transactionId) =>
+      '$cashAccounts/$accountId/transactions/$transactionId';
 
   // Goals
   static const String goals = '/goals';
@@ -51,15 +63,18 @@ class ApiConstants {
   // Credit Cards
   static const String creditCards = '/credit-cards';
   static const String creditCardsSummary = '/credit-cards/summary';
-  static String creditCardPayments(String cardId) => '/credit-cards/$cardId/payments';
+  static String creditCardPayments(String cardId) =>
+      '/credit-cards/$cardId/payments';
 
   // Notification Preferences
-  static const String notificationPreferences = '/users/me/notification-preferences';
+  static const String notificationPreferences =
+      '/users/me/notification-preferences';
 
   // Shared Groups
   static const String sharedGroups = '/shared-groups';
   static const String sharedGroupsJoin = '/shared-groups/join';
-  static const String sharedGroupsWidgetSummary = '/shared-groups/widget-summary';
+  static const String sharedGroupsWidgetSummary =
+      '/shared-groups/widget-summary';
   static const String mySharedExpenses = '/shared-groups/my-shared-expenses';
   static String sharedGroupDetail(String id) => '/shared-groups/$id';
   static String sharedGroupLeave(String id) => '/shared-groups/$id/leave';
@@ -72,9 +87,13 @@ class ApiConstants {
       '/shared-groups/$groupId/expenses/$expenseId/approve';
   static String sharedGroupExpenseReject(String groupId, String expenseId) =>
       '/shared-groups/$groupId/expenses/$expenseId/reject';
-  static String sharedGroupSettlements(String id) => '/shared-groups/$id/settlements';
+  static String sharedGroupSettlements(String id) =>
+      '/shared-groups/$id/settlements';
+  static String sharedGroupSettlement(String groupId, String settlementId) =>
+      '/shared-groups/$groupId/settlements/$settlementId';
   static String sharedGroupStats(String id) => '/shared-groups/$id/stats';
-  static String sharedGroupExportCsv(String id) => '/shared-groups/$id/export/csv';
+  static String sharedGroupExportCsv(String id) =>
+      '/shared-groups/$id/export/csv';
   static String sharedGroupImport(String id) => '/shared-groups/$id/import';
   static String sharedGroupSettings(String id) => '/shared-groups/$id/settings';
 }

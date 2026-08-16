@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
+import '../../../../core/router/app_router.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 //  Domain models
@@ -81,8 +84,7 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
 
     final amount =
         double.parse(_amountCtrl.text.replaceAll(',', '').replaceAll(' ', ''));
-    final annualRate =
-        double.parse(_rateCtrl.text.replaceAll(',', '.'));
+    final annualRate = double.parse(_rateCtrl.text.replaceAll(',', '.'));
     final termInput = int.parse(_termCtrl.text.trim());
     final n = _termInMonths ? termInput : termInput * 12;
     final r = annualRate / 100 / 12;
@@ -130,8 +132,18 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 900;
+
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: isMobile
+            ? IconButton(
+                tooltip: 'Volver a configuración',
+                onPressed: () => context.go(AppRoutes.settings),
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -152,10 +164,8 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
               const SizedBox(height: 2),
               Text(
                 'Simulador de crédito · Sistema Francés',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 16),
               _InputCard(
@@ -173,8 +183,7 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
                 _AmortizationCard(
                   result: _result!,
                   showTable: _showTable,
-                  onToggle: () =>
-                      setState(() => _showTable = !_showTable),
+                  onToggle: () => setState(() => _showTable = !_showTable),
                 ),
               ],
             ],
@@ -184,7 +193,6 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
     );
   }
 }
-
 // ──────────────────────────────────────────────────────────────────────────────
 //  Input Card
 // ──────────────────────────────────────────────────────────────────────────────
@@ -278,7 +286,8 @@ class _InputCard extends StatelessWidget {
             decoration: InputDecoration(
               labelText: 'Monto del préstamo',
               hintText: '100,000',
-              prefixIcon: const Icon(Icons.payments_outlined, size: 20),
+              prefixIcon:
+                  const Icon(Icons.account_balance_wallet_outlined, size: 20),
               suffixText: 'L',
               filled: true,
               fillColor: inputFill,
@@ -302,8 +311,7 @@ class _InputCard extends StatelessWidget {
           // Tasa anual
           TextFormField(
             controller: rateCtrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: 'Tasa de interés anual',
               hintText: '18.5',
@@ -330,83 +338,100 @@ class _InputCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Plazo + toggle meses/años
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: termCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final termField = TextFormField(
+                controller: termCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: 'Plazo',
+                  hintText: termInMonths ? '36' : '3',
+                  prefixIcon:
+                      const Icon(Icons.calendar_today_outlined, size: 20),
+                  filled: true,
+                  fillColor: inputFill,
+                  border: inputBorder,
+                  enabledBorder: inputBorder,
+                  focusedBorder: inputFocusBorder,
+                  errorBorder: inputBorder.copyWith(
+                      borderSide:
+                          const BorderSide(color: Colors.red, width: 1)),
+                  focusedErrorBorder: inputFocusBorder.copyWith(
+                      borderSide:
+                          const BorderSide(color: Colors.red, width: 2)),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Ingresa el plazo';
+                  final val = int.tryParse(v);
+                  if (val == null || val <= 0) return 'Plazo inválido';
+                  final months = termInMonths ? val : val * 12;
+                  if (months > 600) return 'Máx. 50 años';
+                  return null;
+                },
+              );
+              final termSelector = Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Meses')),
+                    ButtonSegment(value: false, label: Text('Años')),
                   ],
-                  decoration: InputDecoration(
-                    labelText: 'Plazo',
-                    hintText: termInMonths ? '36' : '3',
-                    prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
-                    filled: true,
-                    fillColor: inputFill,
-                    border: inputBorder,
-                    enabledBorder: inputBorder,
-                    focusedBorder: inputFocusBorder,
-                    errorBorder: inputBorder.copyWith(
-                        borderSide: const BorderSide(color: Colors.red, width: 1)),
-                    focusedErrorBorder: inputFocusBorder.copyWith(
-                        borderSide: const BorderSide(color: Colors.red, width: 2)),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Ingresa el plazo';
-                    final val = int.tryParse(v);
-                    if (val == null || val <= 0) return 'Plazo inválido';
-                    final months = termInMonths ? val : val * 12;
-                    if (months > 600) return 'Máx. 50 años';
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: true, label: Text('Meses')),
-                      ButtonSegment(value: false, label: Text('Años')),
-                    ],
-                    selected: {termInMonths},
-                    onSelectionChanged: (s) => onTermChanged(s.first),
-                    style: const ButtonStyle(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+                  selected: {termInMonths},
+                  onSelectionChanged: (s) => onTermChanged(s.first),
+                  style: const ButtonStyle(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
+              );
 
-            // Calcular button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: onCalculate,
-                icon: const Icon(Icons.calculate_outlined),
-                label: const Text(
-                  'Calcular cuota',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
+              if (constraints.maxWidth < 430) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    termField,
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: termSelector,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: termField),
+                  const SizedBox(width: 12),
+                  termSelector,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Calcular button
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton.icon(
+              onPressed: onCalculate,
+              icon: const Icon(Icons.calculate_outlined),
+              label: const Text(
+                'Calcular cuota',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 }
-
 // ──────────────────────────────────────────────────────────────────────────────
 //  Result Card
 // ──────────────────────────────────────────────────────────────────────────────
@@ -429,8 +454,7 @@ class _ResultCard extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       color: cs.primaryContainer.withAlpha(60),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -464,11 +488,13 @@ class _ResultCard extends StatelessWidget {
             // ── Hero: cuota mensual ──────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [cs.primary, Color.lerp(cs.primary, Colors.black, 0.15)!],
+                  colors: [
+                    cs.primary,
+                    Color.lerp(cs.primary, Colors.black, 0.15)!
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -508,7 +534,7 @@ class _ResultCard extends StatelessWidget {
                 _Metric(
                   label: 'Total a pagar',
                   value: 'L. ${fmtShort.format(result.totalPayment)}',
-                  icon: Icons.payments_outlined,
+                  icon: Icons.account_balance_wallet_outlined,
                 ),
                 const SizedBox(width: 8),
                 _Metric(
@@ -524,8 +550,7 @@ class _ResultCard extends StatelessWidget {
               children: [
                 _Metric(
                   label: '% del total',
-                  value:
-                      '${result.interestPct.toStringAsFixed(1)}% interés',
+                  value: '${result.interestPct.toStringAsFixed(1)}% interés',
                   icon: Icons.pie_chart_outline,
                   accent: Colors.orange,
                 ),
@@ -568,14 +593,12 @@ class _ResultCard extends StatelessWidget {
               children: [
                 _Legend(
                   color: cs.primary,
-                  label:
-                      'Capital ${result.capitalPct.toStringAsFixed(1)}%',
+                  label: 'Capital ${result.capitalPct.toStringAsFixed(1)}%',
                 ),
                 const SizedBox(width: 16),
                 _Legend(
                   color: Colors.orange,
-                  label:
-                      'Interés ${result.interestPct.toStringAsFixed(1)}%',
+                  label: 'Interés ${result.interestPct.toStringAsFixed(1)}%',
                 ),
               ],
             ),
@@ -604,11 +627,11 @@ class _AmortizationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tableWidth = math.max(MediaQuery.sizeOf(context).width - 32, 720.0);
 
     return Card(
       elevation: 0,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       color: cs.surfaceContainerLow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,25 +682,77 @@ class _AmortizationCard extends StatelessWidget {
 
           if (showTable) ...[
             const SizedBox(height: 12),
-            // Column headers
-            Container(
-              color: cs.surfaceContainerHighest.withAlpha(90),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: const Row(
-                children: [
-                  _TH('#', flex: 1),
-                  _TH('Fecha', flex: 3),
-                  _TH('Cuota', flex: 3, right: true),
-                  _TH('Capital', flex: 3, right: true),
-                  _TH('Interés', flex: 3, right: true),
-                  _TH('Saldo', flex: 3, right: true),
-                ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: tableWidth,
+                child: Table(
+                  columnWidths: const {
+                    0: FixedColumnWidth(52),
+                    1: FixedColumnWidth(108),
+                    2: FixedColumnWidth(140),
+                    3: FixedColumnWidth(140),
+                    4: FixedColumnWidth(140),
+                    5: FixedColumnWidth(140),
+                  },
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  border: TableBorder(
+                    horizontalInside: BorderSide(
+                      color: cs.outlineVariant.withAlpha(32),
+                    ),
+                  ),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withAlpha(90),
+                      ),
+                      children: const [
+                        _TableCellText('#', header: true),
+                        _TableCellText('Fecha', header: true),
+                        _TableCellText('Cuota', header: true, right: true),
+                        _TableCellText('Capital', header: true, right: true),
+                        _TableCellText('Interés', header: true, right: true),
+                        _TableCellText('Saldo', header: true, right: true),
+                      ],
+                    ),
+                    ...result.rows.map(
+                      (row) => TableRow(
+                        decoration: BoxDecoration(
+                          color: row.number.isEven
+                              ? cs.surfaceContainerHighest.withAlpha(45)
+                              : Colors.transparent,
+                        ),
+                        children: [
+                          _TableCellText('${row.number}'),
+                          _TableCellText(
+                            DateFormat('d MMM yy', 'es').format(row.date),
+                          ),
+                          _TableCellText(
+                            NumberFormat('#,##0', 'es').format(row.payment),
+                            right: true,
+                          ),
+                          _TableCellText(
+                            NumberFormat('#,##0', 'es').format(row.capital),
+                            right: true,
+                            color: cs.primary,
+                            emphasis: true,
+                          ),
+                          _TableCellText(
+                            NumberFormat('#,##0', 'es').format(row.interest),
+                            right: true,
+                            color: Colors.orange,
+                          ),
+                          _TableCellText(
+                            NumberFormat('#,##0', 'es').format(row.balance),
+                            right: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            // Data rows
-            ...result.rows.map((row) => _TableRow(row: row)),
-            const SizedBox(height: 8),
           ] else
             const SizedBox(height: 16),
         ],
@@ -686,90 +761,46 @@ class _AmortizationCard extends StatelessWidget {
   }
 }
 
-class _TableRow extends StatelessWidget {
-  final _AmortRow row;
-  const _TableRow({required this.row});
+class _TableCellText extends StatelessWidget {
+  final String text;
+  final bool header;
+  final bool right;
+  final Color? color;
+  final bool emphasis;
+
+  const _TableCellText(
+    this.text, {
+    this.header = false,
+    this.right = false,
+    this.color,
+    this.emphasis = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final fmt = NumberFormat('#,##0', 'es');
-    final isEven = row.number % 2 == 0;
+    final theme = Theme.of(context);
+    final textColor = color ??
+        (header
+            ? theme.colorScheme.onSurface
+            : theme.colorScheme.onSurfaceVariant);
 
-    return Container(
-      color: isEven
-          ? cs.surfaceContainerHighest.withAlpha(45)
-          : Colors.transparent,
-      padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${row.number}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              DateFormat('MMM yy', 'es').format(row.date),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontSize: 11),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              fmt.format(row.payment),
-              textAlign: TextAlign.right,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontSize: 11),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              fmt.format(row.capital),
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              fmt.format(row.interest),
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    color: Colors.orange,
-                  ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              fmt.format(row.balance),
-              textAlign: TextAlign.right,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontSize: 11),
-            ),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        8,
+        header ? 10 : 8,
+        8,
+        header ? 10 : 8,
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: right ? TextAlign.right : TextAlign.left,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: textColor,
+          fontSize: header ? 11 : 12,
+          fontWeight: header || emphasis ? FontWeight.w700 : FontWeight.w500,
+        ),
       ),
     );
   }
@@ -849,35 +880,9 @@ class _Legend extends StatelessWidget {
         ),
         const SizedBox(width: 5),
         Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(fontSize: 11)),
+            style:
+                Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
       ],
-    );
-  }
-}
-
-class _TH extends StatelessWidget {
-  final String text;
-  final int flex;
-  final bool right;
-
-  const _TH(this.text, {required this.flex, this.right = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        text,
-        textAlign: right ? TextAlign.right : TextAlign.left,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-              letterSpacing: 0.4,
-            ),
-      ),
     );
   }
 }

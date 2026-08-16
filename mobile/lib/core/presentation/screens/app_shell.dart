@@ -12,14 +12,16 @@ import '../widgets/offline_banner.dart';
 import '../../providers/experience_provider.dart';
 
 class AppShell extends ConsumerStatefulWidget {
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.child, required this.location});
   final Widget child;
+  final String location;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -63,8 +65,21 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     AppRoutes.shared,
   ];
 
-  static const _labelsAdvanced = ['Inicio', 'Gastos', 'Ingresos', 'Presup.', 'Metas', 'Grupos'];
-  static const _labelsSimple = ['Inicio', 'Gastos', 'Ingresos', 'Metas', 'Grupos'];
+  static const _labelsAdvanced = [
+    'Inicio',
+    'Gastos',
+    'Ingresos',
+    'Presup.',
+    'Metas',
+    'Grupos'
+  ];
+  static const _labelsSimple = [
+    'Inicio',
+    'Gastos',
+    'Ingresos',
+    'Metas',
+    'Grupos'
+  ];
 
   static const _iconsAdvanced = [
     Icons.home_outlined,
@@ -106,7 +121,10 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     final icons = isSimple ? _iconsSimple : _iconsAdvanced;
     final activeIcons = isSimple ? _activeIconsSimple : _activeIconsAdvanced;
 
-    final location = GoRouterState.of(context).matchedLocation;
+    final location = widget.location;
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 900;
+    final isWideDesktop = width >= 1200;
 
     // Guard: if the user is on /budgets but switches to simple mode, redirect home.
     if (isSimple && location.startsWith(AppRoutes.budgets)) {
@@ -116,59 +134,84 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     }
 
     final currentIndex = _tabIndex(location, tabs);
+    final content = Column(
+      children: [
+        const OfflineBanner(),
+        Expanded(child: widget.child),
+      ],
+    );
+    final rail = NavigationRail(
+      extended: isWideDesktop,
+      labelType: isWideDesktop
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      selectedIndex: currentIndex,
+      onDestinationSelected: (i) => context.go(tabs[i]),
+      destinations: List.generate(
+        tabs.length,
+        (i) => NavigationRailDestination(
+          icon: Icon(icons[i]),
+          selectedIcon: Icon(activeIcons[i]),
+          label: Text(labels[i]),
+        ),
+      ),
+    );
 
     return Scaffold(
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(child: widget.child),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).shadowColor.withAlpha(18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: NavigationBar(
-              height: 74,
-              selectedIndex: currentIndex,
-              onDestinationSelected: (i) => context.go(tabs[i]),
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: List.generate(
-                tabs.length,
-                (i) => NavigationDestination(
-                  icon: Icon(icons[i]),
-                  selectedIcon: Icon(activeIcons[i]),
-                  label: labels[i],
+      body: isDesktop
+          ? Row(
+              children: [
+                SafeArea(child: rail),
+                Expanded(child: content),
+              ],
+            )
+          : content,
+      bottomNavigationBar: isDesktop
+          ? null
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).shadowColor.withAlpha(18),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: NavigationBar(
+                    height: 74,
+                    selectedIndex: currentIndex,
+                    onDestinationSelected: (i) => context.go(tabs[i]),
+                    labelBehavior:
+                        NavigationDestinationLabelBehavior.alwaysShow,
+                    destinations: List.generate(
+                      tabs.length,
+                      (i) => NavigationDestination(
+                        icon: Icon(icons[i]),
+                        selectedIcon: Icon(activeIcons[i]),
+                        label: labels[i],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-      // FAB only on Expenses list screen for quick add
-      floatingActionButton: location == AppRoutes.expenses
-          ? FloatingActionButton(
-              onPressed: () => context.go(AppRoutes.addExpense),
-              tooltip: 'Agregar gasto',
-              child: const Icon(Icons.add),
-            )
-          : null,
     );
   }
 
   int _tabIndex(String location, List<String> tabs) {
+    final sharedIndex = tabs.indexOf(AppRoutes.shared);
+    if (sharedIndex >= 0 &&
+        (location == AppRoutes.shared || location.startsWith('${AppRoutes.shared}/'))) {
+      return sharedIndex;
+    }
+
     for (var i = 0; i < tabs.length; i++) {
       if (location.startsWith(tabs[i])) return i;
     }

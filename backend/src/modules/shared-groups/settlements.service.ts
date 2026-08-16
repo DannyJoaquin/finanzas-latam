@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SharedSettlement, SharedSettlementPaymentMethod } from './entities/shared-settlement.entity';
-import { CreateSettlementDto } from './shared-groups.dto';
+import { CreateSettlementDto, UpdateSettlementDto } from './shared-groups.dto';
 import { SharedGroupsService } from './shared-groups.service';
 import { CashService } from '../cash/cash.service';
 import { PushNotificationService } from '../../common/services/push-notification.service';
@@ -82,5 +82,41 @@ export class SettlementsService {
       relations: ['payer', 'receiver'],
       order: { date: 'DESC', createdAt: 'DESC' },
     });
+  }
+
+  async updateSettlement(
+    userId: string,
+    groupId: string,
+    settlementId: string,
+    dto: UpdateSettlementDto,
+  ): Promise<SharedSettlement> {
+    const settlement = await this.getEditableSettlement(userId, groupId, settlementId);
+    Object.assign(settlement, {
+      ...dto,
+      ...(dto.date ? { date: new Date(dto.date) } : {}),
+    });
+    return this.settlementRepo.save(settlement);
+  }
+
+  async removeSettlement(userId: string, groupId: string, settlementId: string): Promise<void> {
+    const settlement = await this.getEditableSettlement(userId, groupId, settlementId);
+    await this.settlementRepo.remove(settlement);
+  }
+
+  private async getEditableSettlement(
+    userId: string,
+    groupId: string,
+    settlementId: string,
+  ): Promise<SharedSettlement> {
+    const group = await this.groupsService.getGroupDetail(userId, groupId);
+    const settlement = await this.settlementRepo.findOne({
+      where: { id: settlementId, groupId },
+      relations: ['payer', 'receiver'],
+    });
+    if (!settlement) throw new NotFoundException('Settlement not found');
+    if (settlement.payerId !== userId && group.ownerId !== userId) {
+      throw new ForbiddenException('Only the payer or group owner can edit this settlement');
+    }
+    return settlement;
   }
 }

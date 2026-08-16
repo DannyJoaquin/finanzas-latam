@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/presentation/widgets/app_error_widget.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../home/models/dashboard_model.dart';
 import '../../../home/providers/dashboard_provider.dart';
 
@@ -14,11 +16,21 @@ class AchievementsScreen extends ConsumerWidget {
     final achievementsAsync = ref.watch(achievementsProvider);
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
+    final isMobile = MediaQuery.sizeOf(context).width < 900;
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const SizedBox.shrink(),
+        leading: isMobile
+            ? IconButton(
+                tooltip: 'Volver a configuración',
+                onPressed: () => context.go(AppRoutes.settings),
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
+        title: isMobile
+            ? const Text('Logros y medallas')
+            : const SizedBox.shrink(),
       ),
       body: achievementsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

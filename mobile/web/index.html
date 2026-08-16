@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Zentri: tus finanzas personales, claras y bajo control.">
+  <meta name="theme-color" content="#1A73E8">
+  <meta name="application-name" content="Zentri">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Zentri">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Zentri | Finanzas personales</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: #121417;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    #zentri-loading {
+      align-items: center;
+      background: #121417;
+      color: #f2f5fb;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      gap: 16px;
+      inset: 0;
+      justify-content: center;
+      position: fixed;
+      z-index: 10;
+    }
+
+    #zentri-loading img {
+      border-radius: 28px;
+      box-shadow: 0 18px 42px rgba(26, 115, 232, 0.28);
+      height: 88px;
+      width: 88px;
+    }
+
+    #zentri-loading span {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="zentri-loading" role="status" aria-label="Cargando Zentri">
+    <img src="icons/Icon-192.png" alt="">
+    <span>Zentri</span>
+  </div>
+
+  <script>
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+
+      window.addEventListener('load', function () {
+        var workerUrl = new URL('firebase-messaging-sw.js', document.baseURI);
+        var appScope = new URL('./', document.baseURI).pathname;
+        var fcmScope = new URL('firebase-cloud-messaging-push-scope/', workerUrl).pathname;
+
+        navigator.serviceWorker.register(workerUrl, { scope: appScope })
+          .catch(function (error) {
+            console.warn('No se pudo registrar el worker de Zentri:', error);
+          });
+        navigator.serviceWorker.register(workerUrl, { scope: fcmScope })
+          .catch(function (error) {
+            console.warn('No se pudo registrar el worker de FCM:', error);
+          });
+      });
+    }());
+  </script>
+
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loading = document.getElementById('zentri-loading');
+      if (loading) loading.remove();
+      document.body.style.overflow = '';
+    });
+  </script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import '../../../home/providers/dashboard_provider.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
+import '../../../../features/auth/providers/auth_provider.dart';
 
 class IncomeModel {
   const IncomeModel({
@@ -207,7 +208,7 @@ class IncomesScreen extends ConsumerWidget {
                                         borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Icon(Icons.attach_money,
+                                      child: Icon(Icons.account_balance_wallet_outlined,
                                           color: AppColors.income,
                                           size: isSimple ? 32 : 24),
                                     ),
@@ -485,10 +486,15 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             TextFormField(
               controller: _amountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Monto estimado', prefixText: 'L '),
+              decoration: InputDecoration(
+                labelText: 'Monto estimado',
+                prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
+              ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requerido';
-                if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Número inválido';
+                final amount = double.tryParse(v.replaceAll(',', '.'));
+                if (amount == null) return 'Número inválido';
+                if (amount <= 0) return 'El monto debe ser mayor que cero';
                 return null;
               },
             ),

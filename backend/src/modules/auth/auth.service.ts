@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { createHash, randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,11 +14,14 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { OAuth2Client } from 'google-auth-library';
+import { EmailService } from '../../common/services/email.service';
 import { User } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_KEY_PREFIX = 'refresh:';
+const PASSWORD_RESET_KEY_PREFIX = 'password-reset:';
+const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
 
 interface GoogleTokenPayload {
   sub: string;
@@ -28,21 +33,25 @@ interface GoogleTokenPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private jwtService: JwtService,
     private configService: ConfigService,
     @InjectRedis() private redis: Redis,
+    private emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ accessToken: string; refreshToken: string }> {
-    const existing = await this.usersRepository.findOne({ where: { email: dto.email } });
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.usersRepository.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
     const user = this.usersRepository.create({
-      email: dto.email,
+      email,
       fullName: dto.fullName,
       passwordHash,
     });
@@ -53,7 +62,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.usersRepository.findOne({
-      where: { email, isActive: true },
+      where: { email: email.trim().toLowerCase(), isActive: true },
     });
     if (!user || !user.passwordHash) return null;
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -97,6 +106,66 @@ export class AuthService {
     await this.redis.set(`${REFRESH_KEY_PREFIX}blacklist:${refreshToken}`, '1', 'EX', ttlSeconds);
   }
 
+  async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.usersRepository.findOne({
+      where: { email: normalizedEmail, isActive: true },
+    });
+
+    if (!user || !user.passwordHash) return;
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = this.hashPasswordResetToken(token);
+    const key = `${PASSWORD_RESET_KEY_PREFIX}${tokenHash}`;
+    await this.redis.set(key, user.id, 'EX', PASSWORD_RESET_TTL_SECONDS);
+
+    try {
+      await this.emailService.sendPasswordReset(user.email, token);
+    } catch (error) {
+      await this.redis.del(key);
+      this.logger.error(
+        'Password reset email could not be sent',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const key = `${PASSWORD_RESET_KEY_PREFIX}${this.hashPasswordResetToken(token)}`;
+    const userId = await this.redis.getdel(key);
+    if (!userId) throw new UnauthorizedException('Invalid or expired reset token');
+
+    const user = await this.usersRepository.findOne({
+      where: { id: userId, isActive: true },
+    });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    await this.usersRepository.save(user);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string | undefined,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId, isActive: true },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    if (user.passwordHash) {
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.usersRepository.save(user);
+  }
+
   async googleLogin(idToken: string): Promise<{ accessToken: string; refreshToken: string; user: Partial<User> }> {
     const googleData = await this.verifyGoogleToken(idToken);
     const user = await this.validateOrCreateGoogleUser(googleData);
@@ -124,9 +193,12 @@ export class AuthService {
       if (!payload || !payload.sub || !payload.email) {
         throw new UnauthorizedException('Invalid Google token payload');
       }
+      if (payload.email_verified !== true) {
+        throw new UnauthorizedException('Google email is not verified');
+      }
       return {
         sub: payload.sub,
-        email: payload.email,
+        email: payload.email.trim().toLowerCase(),
         name: payload.name ?? payload.email,
         picture: payload.picture,
         email_verified: payload.email_verified,
@@ -150,17 +222,16 @@ export class AuthService {
       return this.usersRepository.save(user);
     }
 
-    // Fallback: look up by email (user may have registered with email previously)
     user = await this.usersRepository.findOne({
       where: { email: googleData.email },
     });
 
     if (user) {
-      // Link Google to existing account
+      // Google has already verified the email, so link it to the existing account.
       user.provider = 'google';
       user.providerId = googleData.sub;
       user.emailVerified = true;
-      user.avatarUrl = googleData.picture ?? user.avatarUrl;
+      if (!user.avatarUrl && googleData.picture) user.avatarUrl = googleData.picture;
       return this.usersRepository.save(user);
     }
 
@@ -201,5 +272,9 @@ export class AuthService {
     const unit = match[2];
     const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
     return value * (multipliers[unit] ?? 1);
+  }
+
+  private hashPasswordResetToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }

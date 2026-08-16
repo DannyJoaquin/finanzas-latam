@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../expenses/providers/expenses_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 
@@ -26,19 +29,21 @@ class RuleModel {
   final List<Map<String, dynamic>> actions;
   final int priority;
 
+  static List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return [];
+    return value
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   factory RuleModel.fromJson(Map<String, dynamic> j) => RuleModel(
         id: j['id'] as String,
         name: j['name'] as String,
         isActive: j['isActive'] as bool? ?? true,
         triggerType: j['triggerType'] as String? ?? '',
-        conditions: (j['conditions'] as List<dynamic>?)
-                ?.map((e) => Map<String, dynamic>.from(e as Map))
-                .toList() ??
-            [],
-        actions: (j['actions'] as List<dynamic>?)
-                ?.map((e) => Map<String, dynamic>.from(e as Map))
-                .toList() ??
-            [],
+        conditions: _mapList(j['conditions']),
+        actions: _mapList(j['actions']),
         priority: j['priority'] as int? ?? 1,
       );
 }
@@ -78,11 +83,21 @@ class RulesScreen extends ConsumerWidget {
     final rulesAsync = ref.watch(rulesProvider);
     final monthRaw = DateFormat('MMMM yyyy', 'es').format(DateTime.now());
     final monthTitle = monthRaw[0].toUpperCase() + monthRaw.substring(1);
+    final isMobile = MediaQuery.sizeOf(context).width < 900;
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const SizedBox.shrink(),
+        leading: isMobile
+            ? IconButton(
+                tooltip: 'Volver a configuración',
+                onPressed: () => context.go(AppRoutes.settings),
+                icon: const Icon(Icons.arrow_back),
+              )
+            : null,
+        title: isMobile
+            ? const Text('Reglas automáticas')
+            : const SizedBox.shrink(),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -329,6 +344,7 @@ class _CreateRuleSheet extends ConsumerStatefulWidget {
 
 class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
   final _nameCtrl = TextEditingController();
+  final _actionValueCtrl = TextEditingController();
   String _trigger = 'expense_added';
   String _action = 'notify';
   String _condField = 'amount';
@@ -339,6 +355,7 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _actionValueCtrl.dispose();
     _condValueCtrl.dispose();
     super.dispose();
   }
@@ -346,6 +363,24 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+
+    final actionParams = switch (_action) {
+      'tag' => {
+          'tag': _actionValueCtrl.text.trim().isEmpty
+              ? name
+              : _actionValueCtrl.text.trim(),
+        },
+      'auto_categorize' => {
+          'categoryId': _actionValueCtrl.text.trim(),
+        },
+      _ => {'message': 'Regla "$name" activada'},
+    };
+    if (_action == 'auto_categorize' && _actionValueCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una categoría')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -363,7 +398,7 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
         'actions': [
           {
             'type': _action,
-            'params': {'message': 'Regla "$name" activada'},
+            'params': actionParams,
           }
         ],
         'priority': 1,
@@ -383,6 +418,8 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final categoriesAsync = ref.watch(categoriesProvider);
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -423,39 +460,52 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
           const SizedBox(height: 16),
 
           // Condition
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _condField,
-                  decoration: const InputDecoration(
-                    labelText: 'Campo',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'amount', child: Text('Monto')),
-                    DropdownMenuItem(value: 'category', child: Text('Categoría')),
-                  ],
-                  onChanged: (v) => setState(() => _condField = v!),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final fieldDropdown = DropdownButtonFormField<String>(
+                initialValue: _condField,
+                decoration: const InputDecoration(
+                  labelText: 'Campo',
+                  border: OutlineInputBorder(),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _condOp,
-                  decoration: const InputDecoration(
-                    labelText: 'Operador',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'gt', child: Text('Mayor que')),
-                    DropdownMenuItem(value: 'lt', child: Text('Menor que')),
-                    DropdownMenuItem(value: 'eq', child: Text('Igual a')),
-                  ],
-                  onChanged: (v) => setState(() => _condOp = v!),
+                items: const [
+                  DropdownMenuItem(value: 'amount', child: Text('Monto')),
+                  DropdownMenuItem(value: 'category', child: Text('Categoría')),
+                ],
+                onChanged: (v) => setState(() => _condField = v!),
+              );
+              final operatorDropdown = DropdownButtonFormField<String>(
+                initialValue: _condOp,
+                decoration: const InputDecoration(
+                  labelText: 'Operador',
+                  border: OutlineInputBorder(),
                 ),
-              ),
-            ],
+                items: const [
+                  DropdownMenuItem(value: 'gt', child: Text('Mayor que')),
+                  DropdownMenuItem(value: 'lt', child: Text('Menor que')),
+                  DropdownMenuItem(value: 'eq', child: Text('Igual a')),
+                ],
+                onChanged: (v) => setState(() => _condOp = v!),
+              );
+
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  children: [
+                    fieldDropdown,
+                    const SizedBox(height: 12),
+                    operatorDropdown,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: fieldDropdown),
+                  const SizedBox(width: 8),
+                  Expanded(child: operatorDropdown),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
           TextField(
@@ -480,6 +530,45 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
                 .toList(),
             onChanged: (v) => setState(() => _action = v!),
           ),
+          if (_action == 'tag') ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _actionValueCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Etiqueta',
+                hintText: 'Ej: revisar',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+          if (_action == 'auto_categorize') ...[
+            const SizedBox(height: 12),
+            categoriesAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text(
+                'No se pudieron cargar las categorías: $e',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              data: (categories) => DropdownButtonFormField<String>(
+                initialValue: categories.any((c) => c.id == _actionValueCtrl.text)
+                    ? _actionValueCtrl.text
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Categoría destino',
+                  border: OutlineInputBorder(),
+                ),
+                items: categories
+                    .map((category) => DropdownMenuItem(
+                          value: category.id,
+                          child: Text(category.name),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(
+                  () => _actionValueCtrl.text = value ?? '',
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
 
           SizedBox(
