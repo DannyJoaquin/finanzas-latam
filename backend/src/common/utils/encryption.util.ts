@@ -1,9 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { requiredSecret } from '../../config/production-env';
 
 const ALGORITHM = 'aes-256-cbc';
 
 function getKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY ?? 'default-32-char-key-change-me!!';
+  const raw = requiredSecret('ENCRYPTION_KEY', 'default-32-char-key-change-me!!');
   // Derive a 32-byte key from the env string
   return scryptSync(raw, 'finanzas-latam-salt', 32) as Buffer;
 }

@@ -102,6 +102,31 @@ cliente Web.
 El modo standalone depende de la instalacion desde Safari; abrir la URL en una
 pestana normal no activa ese modo.
 
+## Despliegue En Cloudflare Pages
+
+El workflow `.github/workflows/pwa.yml` construye la PWA y puede publicarla en
+Cloudflare Pages cuando el repositorio recibe cambios en `main` o se ejecuta
+manualmente. Crea un proyecto de Pages llamado `zentri-pwa` y configura estos
+valores en GitHub:
+
+- Variables: `API_BASE_URL`, `GOOGLE_WEB_CLIENT_ID`.
+- Variables opcionales de Firebase: `FIREBASE_WEB_API_KEY`,
+  `FIREBASE_WEB_APP_ID`, `FIREBASE_WEB_MESSAGING_SENDER_ID`,
+  `FIREBASE_WEB_PROJECT_ID`, `FIREBASE_WEB_AUTH_DOMAIN`,
+  `FIREBASE_WEB_STORAGE_BUCKET`, `FIREBASE_WEB_VAPID_KEY`.
+- Secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+
+`API_BASE_URL` debe apuntar a una API HTTPS, por ejemplo:
+
+```text
+https://api.zentri.tech/api/v1
+```
+
+El service worker solo cachea el shell y recursos estaticos despues de una
+visita exitosa. No cachea llamadas de API, tokens ni datos financieros. Las
+operaciones de escritura necesitan conexion para conservar la integridad de
+los datos.
+
 ## Compatibilidad Y Limites Web
 
 - Hive conserva preferencias y estado de onboarding en el almacenamiento Web.

@@ -1,0 +1,56 @@
+name: Zentri PWA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Build PWA
+        run: >-
+          flutter build web --release --no-wasm-dry-run
+          --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+          --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          --dart-define=FIREBASE_WEB_API_KEY=${{ vars.FIREBASE_WEB_API_KEY }}
+          --dart-define=FIREBASE_WEB_APP_ID=${{ vars.FIREBASE_WEB_APP_ID }}
+          --dart-define=FIREBASE_WEB_MESSAGING_SENDER_ID=${{ vars.FIREBASE_WEB_MESSAGING_SENDER_ID }}
+          --dart-define=FIREBASE_WEB_PROJECT_ID=${{ vars.FIREBASE_WEB_PROJECT_ID }}
+          --dart-define=FIREBASE_WEB_AUTH_DOMAIN=${{ vars.FIREBASE_WEB_AUTH_DOMAIN }}
+          --dart-define=FIREBASE_WEB_STORAGE_BUCKET=${{ vars.FIREBASE_WEB_STORAGE_BUCKET }}
+          --dart-define=FIREBASE_WEB_VAPID_KEY=${{ vars.FIREBASE_WEB_VAPID_KEY }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: zentri-pwa
+          directory: mobile/build/web
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main

@@ -50,6 +50,26 @@ When `MAIL_HOST` is empty in development, the API logs the reset link instead of
 sending email. The HTTP response remains generic for unknown, Google-only, and
 local accounts so it does not disclose whether an email is registered.
 
+## Production environment
+
+Production must provide `JWT_SECRET` and `JWT_REFRESH_SECRET` with at least 32
+characters, plus `ALLOWED_ORIGINS`. Managed providers can be configured without
+changing the NestJS architecture:
+
+- `DATABASE_URL` for PostgreSQL (for example Neon) and `DB_SSL=true`.
+- `REDIS_URL=rediss://...` for Redis (for example Upstash).
+- `GOOGLE_CLIENT_ID` for the Web OAuth client.
+- `WEB_APP_URL=https://app.zentri.tech` for password reset links.
+
+The public health endpoint is `GET /api/v1/health`. It does not require a JWT
+and can be used as the platform health check. Run migrations separately before
+starting the application:
+
+```bash
+npm run migration:run
+npm run start:prod
+```
+
 ## Compile and run the project
 
 ```bash

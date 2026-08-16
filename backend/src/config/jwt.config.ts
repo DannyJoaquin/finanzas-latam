@@ -1,8 +1,12 @@
 import { registerAs } from '@nestjs/config';
+import { requiredSecret } from './production-env';
 
 export default registerAs('jwt', () => ({
-  secret: process.env.JWT_SECRET ?? 'fallback-secret',
+  secret: requiredSecret('JWT_SECRET', 'dev-jwt-secret-change-in-production'),
   expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-  refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'fallback-refresh-secret',
+  refreshSecret: requiredSecret(
+    'JWT_REFRESH_SECRET',
+    'dev-refresh-secret-change-in-production',
+  ),
   refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
 }));

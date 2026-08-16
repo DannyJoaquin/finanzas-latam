@@ -30,6 +30,8 @@ import { CategorizationModule } from './modules/categorization/categorization.mo
 import { SharedGroupsModule } from './modules/shared-groups/shared-groups.module';
 import { RecurringExpensesModule } from './modules/recurring-expenses/recurring-expenses.module';
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 // Jobs
 import { InsightsGeneratorJob } from './jobs/insights-generator.job';
@@ -84,11 +86,28 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'single',
-        options: {
-          host: config.get<string>('redis.host'),
-          port: config.get<number>('redis.port'),
-          password: config.get<string>('redis.password') || undefined,
-        },
+        options: (() => {
+          const configuredUrl = config.get<string>('redis.url');
+          const parsed = configuredUrl ? new URL(configuredUrl) : undefined;
+          const password = parsed?.password
+            ? decodeURIComponent(parsed.password)
+            : config.get<string>('redis.password') || undefined;
+          return {
+            host: parsed?.hostname ?? config.get<string>('redis.host'),
+            port: parsed?.port
+              ? Number(parsed.port)
+              : config.get<number>('redis.port'),
+            username: parsed?.username
+              ? decodeURIComponent(parsed.username)
+              : undefined,
+            password,
+            tls:
+              configuredUrl?.startsWith('rediss://') ||
+              config.get<boolean>('redis.tls')
+                ? {}
+                : undefined,
+          };
+        })(),
       }),
     }),
 
@@ -128,7 +147,9 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
     SharedGroupsModule,
     RecurringExpensesModule,
   ],
+  controllers: [AppController],
   providers: [
+    AppService,
     // Global JWT guard — all routes require auth unless @Public()
     { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },
     // Global rate limiting

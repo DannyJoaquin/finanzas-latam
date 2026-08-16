@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { requiredProductionValue } from './production-env';
 
 export default registerAs('mail', () => ({
   host: process.env.MAIL_HOST ?? '',
@@ -7,5 +8,5 @@ export default registerAs('mail', () => ({
   user: process.env.MAIL_USER ?? '',
   password: process.env.MAIL_PASSWORD ?? '',
   from: process.env.MAIL_FROM ?? 'Zentri <no-reply@zentri.app>',
-  appUrl: process.env.WEB_APP_URL ?? 'http://localhost:8092',
+  appUrl: requiredProductionValue('WEB_APP_URL', 'http://localhost:8092'),
 }));

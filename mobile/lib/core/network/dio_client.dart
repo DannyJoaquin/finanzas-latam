@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
@@ -17,7 +18,7 @@ final dioProvider = Provider<Dio>((ref) {
 
   final tokenStorage = ref.watch(tokenStorageProvider);
 
-  dio.interceptors.addAll([
+  final interceptors = <Interceptor>[
     // Unwrap backend TransformInterceptor: {data: <payload>} → <payload>
     InterceptorsWrapper(
       onResponse: (response, handler) {
@@ -70,15 +71,21 @@ final dioProvider = Provider<Dio>((ref) {
         return handler.next(error);
       },
     ),
-    // Logging (debug only)
-    PrettyDioLogger(
-      requestHeader: false,
-      requestBody: true,
-      responseBody: true,
-      error: true,
-      compact: true,
-    ),
-  ]);
+  ];
+
+  if (kDebugMode) {
+    interceptors.add(
+      PrettyDioLogger(
+        requestHeader: false,
+        requestBody: true,
+        responseBody: true,
+        error: true,
+        compact: true,
+      ),
+    );
+  }
+
+  dio.interceptors.addAll(interceptors);
 
   return dio;
 });

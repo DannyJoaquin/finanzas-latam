@@ -1,13 +1,35 @@
 'use strict';
 
-const APP_ROOT = new URL('./', self.location.href);
+// This worker serves two purposes: FCM background notifications and a
+// network-first cache for the static Flutter shell. It never caches API data.
+const APP_ROOT = new URL('/', self.location.origin);
+const CACHE_NAME = 'zentri-shell-v1';
+const SHELL_ASSETS = [
+  appUrl(''),
+  appUrl('index.html'),
+  appUrl('manifest.json'),
+  appUrl('favicon.png'),
+  appUrl('flutter_bootstrap.js'),
+  appUrl('icons/Icon-192.png'),
+  appUrl('icons/Icon-512.png'),
+  appUrl('icons/Icon-maskable-192.png'),
+  appUrl('icons/Icon-maskable-512.png'),
+];
 
 function appUrl(path) {
   return new URL(path, APP_ROOT).toString();
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .catch((error) => {
+        // A partial install should not prevent the app from loading online.
+        console.warn('Zentri shell cache skipped:', error);
+      })
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -15,7 +37,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key.startsWith('zentri-app-shell-'))
+          .filter((key) => key.startsWith('zentri-shell-') && key !== CACHE_NAME)
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
@@ -25,9 +47,43 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-  event.respondWith(fetch(request));
+  if (
+    request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
+    url.pathname.endsWith('/firebase-messaging-sw.js') ||
+    url.pathname.endsWith('/flutter_service_worker.js')
+  ) {
+    return;
+  }
+
+  // API calls normally live on api.zentri.tech and are cross-origin. Keep
+  // this guard as a second line of defense if the API is ever proxied here.
+  if (url.pathname.startsWith('/api/')) return;
+
+  event.respondWith(networkFirst(request));
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.type === 'basic') {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+
+    if (request.mode === 'navigate') {
+      const shell = await cache.match(appUrl('index.html'));
+      if (shell) return shell;
+    }
+
+    throw error;
+  }
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
