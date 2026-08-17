@@ -46,6 +46,29 @@ jobs:
           --dart-define=FIREBASE_WEB_STORAGE_BUCKET=${{ vars.FIREBASE_WEB_STORAGE_BUCKET }}
           --dart-define=FIREBASE_WEB_VAPID_KEY=${{ vars.FIREBASE_WEB_VAPID_KEY }}
 
+      - name: Inject Firebase config into messaging worker
+        env:
+          FIREBASE_WEB_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
+          FIREBASE_WEB_APP_ID: ${{ vars.FIREBASE_WEB_APP_ID }}
+          FIREBASE_WEB_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_WEB_MESSAGING_SENDER_ID }}
+          FIREBASE_WEB_PROJECT_ID: ${{ vars.FIREBASE_WEB_PROJECT_ID }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'build/web/firebase-messaging-sw.js';
+          let source = fs.readFileSync(path, 'utf8');
+          const replacements = {
+            '__FIREBASE_WEB_API_KEY__': process.env.FIREBASE_WEB_API_KEY || '',
+            '__FIREBASE_WEB_APP_ID__': process.env.FIREBASE_WEB_APP_ID || '',
+            '__FIREBASE_WEB_MESSAGING_SENDER_ID__': process.env.FIREBASE_WEB_MESSAGING_SENDER_ID || '',
+            '__FIREBASE_WEB_PROJECT_ID__': process.env.FIREBASE_WEB_PROJECT_ID || '',
+          };
+          for (const [placeholder, value] of Object.entries(replacements)) {
+            source = source.split(placeholder).join(value);
+          }
+          fs.writeFileSync(path, source);
+          NODE
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:

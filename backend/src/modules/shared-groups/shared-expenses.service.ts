@@ -152,8 +152,17 @@ export class SharedExpensesService {
         where: participantUserIds.map((id) => ({ id })),
         select: ['id', 'fullName', 'fcmToken'],
       });
+      const preferences = await this.prefsRepo.find({
+        where: participantUserIds.map((userId) => ({ userId })),
+      });
+      const pushEnabled = new Map(
+        preferences.map((preference) => [
+          preference.userId,
+          preference.pushSharedExpenseChanges,
+        ]),
+      );
       for (const user of users) {
-        if (!user.fcmToken) continue;
+        if (!user.fcmToken || pushEnabled.get(user.id) === false) continue;
         const myShare = shareByUserId.get(user.id) ?? Number(dto.totalAmount);
         await this.pushService.send({
           userId: user.id,

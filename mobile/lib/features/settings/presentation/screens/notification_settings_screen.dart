@@ -76,6 +76,17 @@ class NotificationSettingsScreen extends ConsumerWidget {
               value: prefs.pushMotivation,
               onChanged: (v) => _toggle(ref, context, {'pushMotivation': v}),
             ),
+            _NotifTile(
+              icon: Icons.group_outlined,
+              title: 'Gastos compartidos',
+              subtitle: 'Cuando alguien agrega, edita o elimina un gasto del grupo',
+              value: prefs.pushSharedExpenseChanges,
+              onChanged: (v) => _toggle(
+                ref,
+                context,
+                {'pushSharedExpenseChanges': v},
+              ),
+            ),
             const SizedBox(height: 8),
 
             // ── Tarjetas de crédito ─────────────────────────────────────────

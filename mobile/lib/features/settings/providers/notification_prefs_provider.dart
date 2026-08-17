@@ -12,6 +12,7 @@ class NotificationPreferencesModel {
   final bool pushImportantInsights;
   final bool pushCriticalFinancialAlerts;
   final bool pushMotivation;
+  final bool pushSharedExpenseChanges;
   final bool localCardCutoffAlerts;
   final bool localCardDue5d;
   final bool localCardDue1d;
@@ -27,6 +28,7 @@ class NotificationPreferencesModel {
     required this.pushImportantInsights,
     required this.pushCriticalFinancialAlerts,
     required this.pushMotivation,
+    required this.pushSharedExpenseChanges,
     required this.localCardCutoffAlerts,
     required this.localCardDue5d,
     required this.localCardDue1d,
@@ -46,6 +48,7 @@ class NotificationPreferencesModel {
       pushImportantInsights: b('pushImportantInsights'),
       pushCriticalFinancialAlerts: b('pushCriticalFinancialAlerts'),
       pushMotivation: b('pushMotivation', def: false),
+      pushSharedExpenseChanges: b('pushSharedExpenseChanges'),
       localCardCutoffAlerts: b('localCardCutoffAlerts'),
       localCardDue5d: b('localCardDue5d'),
       localCardDue1d: b('localCardDue1d'),
@@ -63,6 +66,7 @@ class NotificationPreferencesModel {
     bool? pushImportantInsights,
     bool? pushCriticalFinancialAlerts,
     bool? pushMotivation,
+    bool? pushSharedExpenseChanges,
     bool? localCardCutoffAlerts,
     bool? localCardDue5d,
     bool? localCardDue1d,
@@ -80,6 +84,8 @@ class NotificationPreferencesModel {
       pushCriticalFinancialAlerts:
           pushCriticalFinancialAlerts ?? this.pushCriticalFinancialAlerts,
       pushMotivation: pushMotivation ?? this.pushMotivation,
+        pushSharedExpenseChanges:
+          pushSharedExpenseChanges ?? this.pushSharedExpenseChanges,
       localCardCutoffAlerts:
           localCardCutoffAlerts ?? this.localCardCutoffAlerts,
       localCardDue5d: localCardDue5d ?? this.localCardDue5d,
@@ -100,6 +106,7 @@ class NotificationPreferencesModel {
         'pushImportantInsights': pushImportantInsights,
         'pushCriticalFinancialAlerts': pushCriticalFinancialAlerts,
         'pushMotivation': pushMotivation,
+        'pushSharedExpenseChanges': pushSharedExpenseChanges,
         'localCardCutoffAlerts': localCardCutoffAlerts,
         'localCardDue5d': localCardDue5d,
         'localCardDue1d': localCardDue1d,
