@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
 
 permissions:
   contents: read
@@ -53,4 +53,4 @@ jobs:
           projectName: zentri-pwa
           directory: mobile/build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
+          branch: master
