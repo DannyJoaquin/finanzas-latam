@@ -152,6 +152,8 @@ if (isConfigured) {
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
+    if (payload.notification) return;
+
     const notification = payload.notification || {};
     const data = payload.data || {};
     const title = notification.title || 'Nueva alerta';
