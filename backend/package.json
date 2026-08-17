@@ -13,6 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
+    "seed:categories:prod": "node dist/src/database/seeds/seed-production.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

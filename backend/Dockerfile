@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+en FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -23,4 +23,4 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 USER nestjs
 
 EXPOSE 3000
-CMD ["sh", "-c", "npm run migration:run:prod && npm run start:prod"]
+CMD ["sh", "-c", "npm run migration:run:prod && npm run seed:categories:prod && npm run start:prod"]
