@@ -22,6 +22,7 @@ mobile/.packages
 .claude/
 .agents/
 skills-lock.json
+.wrangler/
 
 # OS
 .DS_Store
