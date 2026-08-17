@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Zentri: tus finanzas personales, claras y bajo control.">
   <meta name="theme-color" content="#1A73E8">
   <meta name="application-name" content="Zentri">
@@ -26,7 +26,7 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Zentri">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
@@ -44,12 +44,22 @@
     html,
     body {
       height: 100%;
+      min-height: 100%;
       margin: 0;
       background: #121417;
     }
 
     body {
       overflow: hidden;
+      min-height: 100dvh;
+      height: 100dvh;
+    }
+
+    html.ios-standalone,
+    html.ios-standalone body {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
     }
 
     #zentri-loading {
@@ -88,6 +98,35 @@
 
   <script>
     (function () {
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+
+      if (isStandalone) {
+        document.documentElement.classList.add('ios-standalone');
+
+        var syncViewport = function () {
+          var viewport = window.visualViewport;
+          if (!viewport) return;
+
+          document.documentElement.style.setProperty(
+            '--zentri-viewport-height',
+            viewport.height + 'px',
+          );
+          document.body.style.height = viewport.height + 'px';
+
+          // Flutter's web engine recalculates pointer coordinates after a
+          // viewport resize. iOS standalone can change visualViewport without
+          // emitting the window resize event Flutter normally observes.
+          window.dispatchEvent(new Event('resize'));
+        };
+
+        syncViewport();
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', syncViewport);
+          window.visualViewport.addEventListener('scroll', syncViewport);
+        }
+      }
+
       if (!('serviceWorker' in navigator)) return;
 
       window.addEventListener('load', function () {
