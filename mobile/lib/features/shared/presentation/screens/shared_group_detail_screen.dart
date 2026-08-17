@@ -53,7 +53,7 @@ class _SharedGroupDetailScreenState
     final currentUserId =
         ref.watch(authStateProvider).valueOrNull?.user?.id ?? '';
     final String groupCurrency =
-      groupAsync.valueOrNull?.currency ?? ref.watch(currencyProvider);
+        groupAsync.valueOrNull?.currency ?? ref.watch(currencyProvider);
     final fmt = currencyFmt(groupCurrency);
     final theme = Theme.of(context);
 
@@ -165,6 +165,7 @@ class _SharedGroupDetailScreenState
                 _ExpensesTab(
                   groupId: widget.groupId,
                   currentUserId: currentUserId,
+                  groupOwnerId: groupAsync.valueOrNull?.ownerId,
                   currency: groupCurrency,
                 ),
                 _BalancesTab(
@@ -623,10 +624,12 @@ class _ExpensesTab extends ConsumerWidget {
   const _ExpensesTab({
     required this.groupId,
     required this.currentUserId,
+    required this.groupOwnerId,
     required this.currency,
   });
   final String groupId;
   final String currentUserId;
+  final String? groupOwnerId;
   final String currency;
 
   @override
@@ -697,6 +700,7 @@ class _ExpensesTab extends ConsumerWidget {
                 expense: expense,
                 groupId: groupId,
                 currentUserId: currentUserId,
+                groupOwnerId: groupOwnerId,
                 fmt: fmt,
               );
             },
@@ -751,7 +755,8 @@ class _SharedExpensesOverview extends StatelessWidget {
                   color: primary.withAlpha(24),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.receipt_long_outlined, color: primary, size: 21),
+                child:
+                    Icon(Icons.receipt_long_outlined, color: primary, size: 21),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -761,15 +766,15 @@ class _SharedExpensesOverview extends StatelessWidget {
                     Text(
                       'Resumen del grupo',
                       style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '$expenseCount ${expenseCount == 1 ? 'movimiento' : 'movimientos'} registrados',
                       style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -848,11 +853,13 @@ class _ExpenseCard extends ConsumerWidget {
     required this.expense,
     required this.groupId,
     required this.currentUserId,
+    required this.groupOwnerId,
     required this.fmt,
   });
   final SharedExpenseModel expense;
   final String groupId;
   final String currentUserId;
+  final String? groupOwnerId;
   final NumberFormat fmt;
 
   Future<void> _handleApprove(BuildContext context, WidgetRef ref) async {
@@ -950,163 +957,169 @@ class _ExpenseCard extends ConsumerWidget {
         .where((p) => p.userId == currentUserId)
         .firstOrNull;
     final isPayer = expense.payerId == currentUserId;
+    final canEditExpense = isPayer;
+    final canReviewExpense =
+        expense.status == 'pending' && groupOwnerId == currentUserId;
     final theme = Theme.of(context);
     final dateStr = DateFormat('dd/MM/yy').format(expense.date);
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _handleEdit(context),
+        onTap: canEditExpense ? () => _handleEdit(context) : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          expense.description,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      if (expense.isRecurring) ...[
-                        const SizedBox(width: 6),
-                        Tooltip(
-                          message: expense.recurringInterval == 'weekly'
-                              ? 'Semanal'
-                              : 'Mensual',
-                          child: Icon(Icons.repeat,
-                              size: 14, color: theme.colorScheme.primary),
-                        ),
-                      ],
-                      if (expense.status == 'pending') ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.shade300),
-                          ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
                           child: Text(
-                            'Pendiente',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade800),
+                            expense.description,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
+                        if (expense.isRecurring) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: expense.recurringInterval == 'weekly'
+                                ? 'Semanal'
+                                : 'Mensual',
+                            child: Icon(Icons.repeat,
+                                size: 14, color: theme.colorScheme.primary),
+                          ),
+                        ],
+                        if (expense.status == 'pending') ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Text(
+                              'Pendiente',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade800),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                Text(
-                  fmt.format(expense.totalAmount),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.primary,
+                  Text(
+                    fmt.format(expense.totalAmount),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
-                  onSelected: (value) {
-                    if (value == 'edit') _handleEdit(context);
-                    if (value == 'delete') _handleDelete(context, ref);
-                    if (value == 'approve') _handleApprove(context, ref);
-                    if (value == 'reject') _handleReject(context, ref);
-                  },
-                  itemBuilder: (_) => [
-                    if (expense.status == 'pending') ...[
-                      const PopupMenuItem(
-                          value: 'approve',
-                          child: ListTile(
-                            leading: Icon(Icons.check_circle_outline,
-                                color: Colors.green),
-                            title: Text('Aprobar'),
-                            contentPadding: EdgeInsets.zero,
-                          )),
-                      const PopupMenuItem(
-                          value: 'reject',
-                          child: ListTile(
-                            leading: Icon(Icons.cancel_outlined,
-                                color: Colors.orange),
-                            title: Text('Rechazar'),
-                            contentPadding: EdgeInsets.zero,
-                          )),
-                    ],
-                    const PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          leading: Icon(Icons.edit_outlined),
-                          title: Text('Editar'),
-                          contentPadding: EdgeInsets.zero,
-                        )),
-                    const PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading:
-                              Icon(Icons.delete_outline, color: Colors.red),
-                          title: Text('Eliminar',
-                              style: TextStyle(color: Colors.red)),
-                          contentPadding: EdgeInsets.zero,
-                        )),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Text(
-                  isPayer ? 'Tú pagaste' : 'Pagó ${expense.payerName}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            if (myParticipation != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isPayer
-                      ? Colors.green.shade700.withAlpha(20)
-                      : Colors.orange.shade700.withAlpha(20),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  isPayer
-                      ? 'Tu parte: ${fmt.format(myParticipation.shareAmount)} (de ${fmt.format(expense.totalAmount)})'
-                      : 'Tu parte: ${fmt.format(myParticipation.shareAmount)}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isPayer
-                        ? Colors.green.shade800
-                        : Colors.orange.shade800,
-                  ),
-                ),
+                  const SizedBox(width: 4),
+                  if (canEditExpense || canReviewExpense)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      onSelected: (value) {
+                        if (value == 'edit') _handleEdit(context);
+                        if (value == 'delete') _handleDelete(context, ref);
+                        if (value == 'approve') _handleApprove(context, ref);
+                        if (value == 'reject') _handleReject(context, ref);
+                      },
+                      itemBuilder: (_) => [
+                        if (canReviewExpense) ...[
+                          const PopupMenuItem(
+                              value: 'approve',
+                              child: ListTile(
+                                leading: Icon(Icons.check_circle_outline,
+                                    color: Colors.green),
+                                title: Text('Aprobar'),
+                                contentPadding: EdgeInsets.zero,
+                              )),
+                          const PopupMenuItem(
+                              value: 'reject',
+                              child: ListTile(
+                                leading: Icon(Icons.cancel_outlined,
+                                    color: Colors.orange),
+                                title: Text('Rechazar'),
+                                contentPadding: EdgeInsets.zero,
+                              )),
+                        ],
+                        if (canEditExpense) ...[
+                          const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('Editar'),
+                                contentPadding: EdgeInsets.zero,
+                              )),
+                          const PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete_outline,
+                                    color: Colors.red),
+                                title: Text('Eliminar',
+                                    style: TextStyle(color: Colors.red)),
+                                contentPadding: EdgeInsets.zero,
+                              )),
+                        ],
+                      ],
+                    ),
+                ],
               ),
-            ],
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    isPayer ? 'Tú pagaste' : 'Pagó ${expense.payerName}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    dateStr,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              if (myParticipation != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isPayer
+                        ? Colors.green.shade700.withAlpha(20)
+                        : Colors.orange.shade700.withAlpha(20),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isPayer
+                        ? 'Tu parte: ${fmt.format(myParticipation.shareAmount)} (de ${fmt.format(expense.totalAmount)})'
+                        : 'Tu parte: ${fmt.format(myParticipation.shareAmount)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isPayer
+                          ? Colors.green.shade800
+                          : Colors.orange.shade800,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1160,7 +1173,8 @@ class _BalancesTab extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_outline, size: 56, color: Colors.green),
+                        Icon(Icons.check_circle_outline,
+                            size: 56, color: Colors.green),
                         SizedBox(height: 12),
                         Text('¡Todo saldado!',
                             style: TextStyle(fontWeight: FontWeight.w700)),
@@ -1323,7 +1337,8 @@ class _SettlementHistorySection extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar pago'),
-        content: const Text('¿Eliminar este pago del historial? El balance se recalculará.'),
+        content: const Text(
+            '¿Eliminar este pago del historial? El balance se recalculará.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -1376,7 +1391,8 @@ class _SettlementHistorySection extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Historial de pagos',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               Text('No se pudo cargar el historial.',
                   style: TextStyle(color: theme.colorScheme.error)),
@@ -1386,13 +1402,15 @@ class _SettlementHistorySection extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Historial de pagos',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               if (settlements.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text('Aún no hay pagos registrados en este grupo.',
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                      style:
+                          TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                 )
               else
                 ...settlements.map(
@@ -1401,7 +1419,7 @@ class _SettlementHistorySection extends ConsumerWidget {
                     currentUserId: currentUserId,
                     fmt: fmt,
                     canEdit: settlement.payerId == currentUserId ||
-                      currentUserId == groupOwnerId,
+                        currentUserId == groupOwnerId,
                     onEdit: () => _editSettlement(context, ref, settlement),
                     onDelete: () => _deleteSettlement(context, ref, settlement),
                   ),
@@ -1466,15 +1484,16 @@ class _SettlementHistoryTile extends StatelessWidget {
                 Text(direction,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(
                   '${DateFormat('dd/MM/yyyy').format(settlement.date)} · $method${settlement.note?.isNotEmpty == true ? ' · ${settlement.note}' : ''}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1483,9 +1502,9 @@ class _SettlementHistoryTile extends StatelessWidget {
           Text(
             fmt.format(settlement.amount),
             style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: paidByMe ? Colors.orange.shade700 : Colors.green.shade700,
-                ),
+              fontWeight: FontWeight.w800,
+              color: paidByMe ? Colors.orange.shade700 : Colors.green.shade700,
+            ),
           ),
           if (canEdit)
             PopupMenuButton<String>(
@@ -1509,7 +1528,8 @@ class _SettlementHistoryTile extends StatelessWidget {
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.delete_outline, color: Colors.red),
-                    title: Text('Eliminar pago', style: TextStyle(color: Colors.red)),
+                    title: Text('Eliminar pago',
+                        style: TextStyle(color: Colors.red)),
                   ),
                 ),
               ],
@@ -1534,7 +1554,8 @@ class _EditSettlementSheet extends ConsumerStatefulWidget {
   final VoidCallback onSaved;
 
   @override
-  ConsumerState<_EditSettlementSheet> createState() => _EditSettlementSheetState();
+  ConsumerState<_EditSettlementSheet> createState() =>
+      _EditSettlementSheetState();
 }
 
 class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
@@ -1559,9 +1580,10 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
     );
     _noteCtrl = TextEditingController(text: widget.settlement.note ?? '');
     _date = widget.settlement.date;
-    _paymentMethod = _paymentMethods.containsKey(widget.settlement.paymentMethod)
-        ? widget.settlement.paymentMethod
-        : 'other';
+    _paymentMethod =
+        _paymentMethods.containsKey(widget.settlement.paymentMethod)
+            ? widget.settlement.paymentMethod
+            : 'other';
   }
 
   @override
@@ -1638,14 +1660,16 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: 'Monto',
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                   prefixText: '${currencySymbol(widget.currency)} ',
                 ),
                 validator: (value) {
-                  final amount = double.tryParse(value?.replaceAll(',', '.') ?? '');
+                  final amount =
+                      double.tryParse(value?.replaceAll(',', '.') ?? '');
                   if (amount == null || amount <= 0) return 'Monto inválido';
                   return null;
                 },
@@ -1696,7 +1720,8 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Guardar cambios'),
               ),
@@ -1967,7 +1992,8 @@ class _StatsTab extends ConsumerWidget {
                     : month;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _MonthRow(label: label, amount: amount, pct: pct, fmt: fmt),
+                  child: _MonthRow(
+                      label: label, amount: amount, pct: pct, fmt: fmt),
                 );
               }),
             ],
