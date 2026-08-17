@@ -10,6 +10,7 @@ import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class IncomeModel {
   const IncomeModel({
@@ -34,7 +35,8 @@ class IncomeModel {
         id: j['id'] as String,
         sourceName: j['sourceName'] as String? ?? j['name'] as String? ?? '',
         // Backend may return numeric fields as strings (e.g. "5000.00")
-        amount: double.parse((j['amount'] ?? j['estimatedAmount'] ?? 0).toString()),
+        amount:
+            double.parse((j['amount'] ?? j['estimatedAmount'] ?? 0).toString()),
         type: j['type'] as String? ?? 'salary',
         cycle: j['cycle'] as String? ?? 'monthly',
         isActive: j['isActive'] as bool? ?? true,
@@ -42,11 +44,14 @@ class IncomeModel {
       );
 }
 
-final incomesProvider = FutureProvider.autoDispose<List<IncomeModel>>((ref) async {
+final incomesProvider =
+    FutureProvider.autoDispose<List<IncomeModel>>((ref) async {
   final dio = ref.watch(dioProvider);
   final resp = await dio.get(ApiConstants.incomes);
   final items = resp.data as List<dynamic>? ?? [];
-  return items.map((e) => IncomeModel.fromJson(e as Map<String, dynamic>)).toList();
+  return items
+      .map((e) => IncomeModel.fromJson(e as Map<String, dynamic>))
+      .toList();
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -89,9 +94,13 @@ class IncomesScreen extends ConsumerWidget {
       ),
       body: incomesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(incomesProvider)),
+        error: (e, _) => AppErrorWidget(
+            error: e, onRetry: () => ref.invalidate(incomesProvider)),
         data: (incomes) => incomes.isEmpty
-            ? const Center(child: Text('No tienes ingresos configurados.\nToca + para agregar uno.', textAlign: TextAlign.center))
+            ? const Center(
+                child: Text(
+                    'No tienes ingresos configurados.\nToca + para agregar uno.',
+                    textAlign: TextAlign.center))
             : RefreshIndicator(
                 onRefresh: () => ref.refresh(incomesProvider.future),
                 child: ListView.builder(
@@ -99,14 +108,18 @@ class IncomesScreen extends ConsumerWidget {
                   itemCount: incomes.length + 1,
                   itemBuilder: (_, i) {
                     if (i == 0) {
-                      final total = incomes.fold<double>(0, (s, e) => s + e.amount);
+                      final total =
+                          incomes.fold<double>(0, (s, e) => s + e.amount);
                       final active = incomes.where((e) => e.isActive).length;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Ingresos',
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
                           ),
@@ -116,7 +129,10 @@ class IncomesScreen extends ConsumerWidget {
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
-                                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                           ),
                           const SizedBox(height: 12),
                           Padding(
@@ -125,11 +141,15 @@ class IncomesScreen extends ConsumerWidget {
                               width: double.infinity,
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Theme.of(context).shadowColor.withAlpha(14),
+                                    color: Theme.of(context)
+                                        .shadowColor
+                                        .withAlpha(14),
                                     blurRadius: 20,
                                     offset: const Offset(0, 7),
                                   ),
@@ -140,26 +160,40 @@ class IncomesScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     'Ingresos configurados',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
                                         ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     fmt.format(total),
                                     style: (isSimple
-                                            ? Theme.of(context).textTheme.headlineLarge
-                                            : Theme.of(context).textTheme.headlineMedium)
+                                            ? Theme.of(context)
+                                                .textTheme
+                                                .headlineLarge
+                                            : Theme.of(context)
+                                                .textTheme
+                                                .headlineMedium)
                                         ?.copyWith(
-                                          color: AppColors.income,
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                      color: AppColors.income,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     '$active activos · ${incomes.length} fuentes',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
                                         ),
                                   ),
                                 ],
@@ -180,7 +214,8 @@ class IncomesScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(itemRadius),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context).shadowColor.withAlpha(14),
+                              color:
+                                  Theme.of(context).shadowColor.withAlpha(14),
                               blurRadius: 20,
                               offset: const Offset(0, 6),
                             ),
@@ -189,11 +224,14 @@ class IncomesScreen extends ConsumerWidget {
                         child: _AnimatedCardEntry(
                           index: i,
                           child: Material(
-                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
                             borderRadius: BorderRadius.circular(itemRadius),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(itemRadius),
-                              onTap: () => _showIncomeActionsSheet(context, ref, inc),
+                              onTap: () =>
+                                  _showIncomeActionsSheet(context, ref, inc),
                               child: Padding(
                                 padding: EdgeInsets.symmetric(
                                     horizontal: isSimple ? 20 : 14,
@@ -205,17 +243,20 @@ class IncomesScreen extends ConsumerWidget {
                                       height: iconSize,
                                       decoration: BoxDecoration(
                                         color: AppColors.income.withAlpha(24),
-                                        borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
+                                        borderRadius: BorderRadius.circular(
+                                            isSimple ? 18 : 16),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Icon(Icons.account_balance_wallet_outlined,
+                                      child: Icon(
+                                          Icons.account_balance_wallet_outlined,
                                           color: AppColors.income,
                                           size: isSimple ? 32 : 24),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             inc.sourceName,
@@ -230,7 +271,9 @@ class IncomesScreen extends ConsumerWidget {
                                             '${_typeLabels[inc.type] ?? inc.type} · ${_cycleLabels[inc.cycle] ?? inc.cycle}${inc.nextExpectedAt != null ? ' · Pr\u00f3ximo: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(inc.nextExpectedAt!))}' : ''}',
                                             style: TextStyle(
                                               fontSize: isSimple ? 14 : 12,
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
                                             ),
                                           ),
                                         ],
@@ -238,7 +281,8 @@ class IncomesScreen extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 10),
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
                                         Text(
                                           fmt.format(inc.amount),
@@ -251,7 +295,9 @@ class IncomesScreen extends ConsumerWidget {
                                         const SizedBox(height: 2),
                                         Icon(Icons.chevron_right,
                                             size: 16,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant),
                                       ],
                                     ),
                                   ],
@@ -273,11 +319,13 @@ class IncomesScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _IncomeSheet(onSaved: () => ref.invalidate(incomesProvider)),
+      builder: (_) =>
+          _IncomeSheet(onSaved: () => ref.invalidate(incomesProvider)),
     );
   }
 
-  void _showEditIncomeSheet(BuildContext context, WidgetRef ref, IncomeModel inc) {
+  void _showEditIncomeSheet(
+      BuildContext context, WidgetRef ref, IncomeModel inc) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -288,7 +336,8 @@ class IncomesScreen extends ConsumerWidget {
     );
   }
 
-  void _showIncomeActionsSheet(BuildContext context, WidgetRef ref, IncomeModel inc) {
+  void _showIncomeActionsSheet(
+      BuildContext context, WidgetRef ref, IncomeModel inc) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -307,8 +356,10 @@ class IncomesScreen extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
-              title: const Text('Eliminar ingreso', style: TextStyle(color: AppColors.expense)),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar ingreso',
+                  style: TextStyle(color: AppColors.expense)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDelete(context, ref, inc);
@@ -321,14 +372,17 @@ class IncomesScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, IncomeModel inc) async {
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, IncomeModel inc) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar ingreso'),
         content: Text('¿Eliminar "${inc.sourceName}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.expense),
             onPressed: () => Navigator.pop(ctx, true),
@@ -347,7 +401,8 @@ class IncomesScreen extends ConsumerWidget {
       ref.invalidate(insightsProvider);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -381,7 +436,6 @@ class _AnimatedCardEntry extends StatelessWidget {
 }
 
 // ─── Income Sheet (Add + Edit) ────────────────────────────────────────────────
-
 class _IncomeSheet extends ConsumerStatefulWidget {
   const _IncomeSheet({required this.onSaved, this.existing});
   final VoidCallback onSaved;
@@ -402,8 +456,20 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
 
   bool get _isEditing => widget.existing != null;
 
-  static const _types = ['salary', 'variable', 'remittance', 'freelance', 'other'];
-  static const _typeLabels = ['Salario', 'Variable', 'Remesa', 'Freelance', 'Otro'];
+  static const _types = [
+    'salary',
+    'variable',
+    'remittance',
+    'freelance',
+    'other'
+  ];
+  static const _typeLabels = [
+    'Salario',
+    'Variable',
+    'Remesa',
+    'Freelance',
+    'Otro'
+  ];
   static const _cycles = ['weekly', 'biweekly', 'monthly', 'one_time'];
   static const _cycleLabels = ['Semanal', 'Quincenal', 'Mensual', 'Único'];
 
@@ -413,10 +479,11 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
     final e = widget.existing;
     _nameCtrl = TextEditingController(text: e?.sourceName ?? '');
     _amountCtrl = TextEditingController(
-        text: e != null ? e.amount.toStringAsFixed(2) : '');
+        text: e != null ? formatMoneyInputValue(e.amount) : '');
     _type = e?.type ?? 'salary';
     _cycle = e?.cycle ?? 'monthly';
-    _nextExpectedAt = e?.nextExpectedAt != null ? DateTime.parse(e!.nextExpectedAt!) : null;
+    _nextExpectedAt =
+        e?.nextExpectedAt != null ? DateTime.parse(e!.nextExpectedAt!) : null;
   }
 
   @override
@@ -435,7 +502,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
       final forceSimpleDefaults = isSimple && !_isEditing;
       final body = {
         'sourceName': _nameCtrl.text.trim(),
-        'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+        'amount': parseMoneyInput(_amountCtrl.text),
         'type': forceSimpleDefaults ? 'salary' : _type,
         'cycle': forceSimpleDefaults ? 'monthly' : _cycle,
         'nextExpectedAt': forceSimpleDefaults
@@ -443,7 +510,8 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             : _nextExpectedAt?.toIso8601String().substring(0, 10),
       };
       if (_isEditing) {
-        await dio.patch('${ApiConstants.incomes}/${widget.existing!.id}', data: body);
+        await dio.patch('${ApiConstants.incomes}/${widget.existing!.id}',
+            data: body);
       } else {
         await dio.post(ApiConstants.incomes, data: body);
       }
@@ -453,7 +521,9 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
       ref.invalidate(insightsProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -479,20 +549,25 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             const SizedBox(height: 20),
             TextFormField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Fuente de ingreso', prefixIcon: Icon(Icons.work_outline)),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              decoration: const InputDecoration(
+                  labelText: 'Fuente de ingreso',
+                  prefixIcon: Icon(Icons.work_outline)),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [MoneyInputFormatter()],
               decoration: InputDecoration(
                 labelText: 'Monto estimado',
                 prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requerido';
-                final amount = double.tryParse(v.replaceAll(',', '.'));
+                final amount = parseMoneyInput(v);
                 if (amount == null) return 'Número inválido';
                 if (amount <= 0) return 'El monto debe ser mayor que cero';
                 return null;
@@ -503,16 +578,20 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
               DropdownButtonFormField<String>(
                 initialValue: _type,
                 decoration: const InputDecoration(labelText: 'Tipo'),
-                items: List.generate(_types.length,
-                    (i) => DropdownMenuItem(value: _types[i], child: Text(_typeLabels[i]))),
+                items: List.generate(
+                    _types.length,
+                    (i) => DropdownMenuItem(
+                        value: _types[i], child: Text(_typeLabels[i]))),
                 onChanged: (v) => setState(() => _type = v!),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _cycle,
                 decoration: const InputDecoration(labelText: 'Frecuencia'),
-                items: List.generate(_cycles.length,
-                    (i) => DropdownMenuItem(value: _cycles[i], child: Text(_cycleLabels[i]))),
+                items: List.generate(
+                    _cycles.length,
+                    (i) => DropdownMenuItem(
+                        value: _cycles[i], child: Text(_cycleLabels[i]))),
                 onChanged: (v) => setState(() => _cycle = v!),
               ),
               const SizedBox(height: 16),
@@ -542,7 +621,8 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
                         IconButton(
                           icon: const Icon(Icons.close, size: 18),
                           tooltip: 'Quitar fecha',
-                          onPressed: () => setState(() => _nextExpectedAt = null),
+                          onPressed: () =>
+                              setState(() => _nextExpectedAt = null),
                         ),
                     ],
                   ),
@@ -553,7 +633,10 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
             FilledButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(_isEditing ? 'Guardar cambios' : 'Guardar'),
             ),
           ],

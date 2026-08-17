@@ -13,6 +13,7 @@ import { SharedGroupMember, SharedGroupMemberStatus } from './entities/shared-gr
 import { SharedGroup } from './entities/shared-group.entity';
 import { User } from '../users/user.entity';
 import { UserNotificationPreferences } from '../users/user-notification-preferences.entity';
+import { Insight, InsightPriority, InsightType } from '../insights/insight.entity';
 
 @Injectable()
 export class SharedExpensesService {
@@ -33,6 +34,8 @@ export class SharedExpensesService {
     private approvalRepo: Repository<SharedExpenseApproval>,
     @InjectRepository(UserNotificationPreferences)
     private prefsRepo: Repository<UserNotificationPreferences>,
+    @InjectRepository(Insight)
+    private insightRepo: Repository<Insight>,
     private groupsService: SharedGroupsService,
     private cashService: CashService,
     private pushService: PushNotificationService,
@@ -161,6 +164,29 @@ export class SharedExpensesService {
           skipDailyCap: true,
         }).catch(() => {/* Non-fatal */});
       }
+
+      // Persist an in-app notification as well, so the event is visible even
+      // when the browser has no FCM permission or the user is offline.
+      const notificationBody = `${payerName} agregó "${dto.description}" en ${groupName} por L ${Number(dto.totalAmount).toFixed(2)}.`;
+      await this.insightRepo.save(
+        participantUserIds.map((userId) =>
+          this.insightRepo.create({
+            userId,
+            type: InsightType.PATTERN,
+            priority: InsightPriority.MEDIUM,
+            title: 'Nuevo gasto compartido',
+            body: notificationBody,
+            metadata: {
+              notificationType: 'shared_expense_created',
+              groupId,
+              expenseId: saved.id,
+              payerId: currentUserId,
+            },
+            isRead: false,
+            isDismissed: false,
+          }),
+        ),
+      );
     }
 
     const created = await this.expenseRepo.findOne({

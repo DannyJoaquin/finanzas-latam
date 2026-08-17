@@ -12,6 +12,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/constants/currency_format.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -1076,7 +1077,7 @@ class _EditExpenseSheet extends ConsumerStatefulWidget {
 class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
   late final _amountCtrl = TextEditingController(
-    text: widget.expense.amount.toStringAsFixed(2),
+    text: formatMoneyInputValue(widget.expense.amount),
   );
   late final _descCtrl =
       TextEditingController(text: widget.expense.description);
@@ -1124,7 +1125,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
       final dio = ref.read(dioProvider);
       final desc = _descCtrl.text.trim();
       await dio.patch('${ApiConstants.expenses}/${widget.expense.id}', data: {
-        'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+        'amount': parseMoneyInput(_amountCtrl.text),
         if (desc.isNotEmpty) 'description': desc,
         'categoryId': _selectedCategoryId,
         'paymentMethod': _paymentMethod,
@@ -1222,6 +1223,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                 controller: _amountCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [MoneyInputFormatter()],
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: 'Monto',
@@ -1229,7 +1231,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Requerido';
-                  final n = double.tryParse(v.replaceAll(',', '.'));
+                  final n = parseMoneyInput(v);
                   if (n == null || n <= 0) return 'Monto inválido';
                   return null;
                 },

@@ -14,6 +14,7 @@ import '../../../../features/credit_cards/providers/credit_cards_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../features/home/providers/dashboard_provider.dart';
 import '../../../../core/providers/experience_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({super.key});
@@ -43,6 +44,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     _currency ??= ref.read(currencyProvider);
     return _currency!;
   }
+
   bool _saving = false;
 
   static const _payMethods = {
@@ -66,7 +68,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       if (_suggestion != null) setState(() => _suggestion = null);
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 600), () => _fetchSuggestion(text));
+    _debounce =
+        Timer(const Duration(milliseconds: 600), () => _fetchSuggestion(text));
   }
 
   Future<void> _fetchSuggestion(String description) async {
@@ -77,9 +80,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       if (!mounted) return;
       // Only auto-select if the returned categoryId is a leaf category in the
       // selectable dropdown list (backend may return a parent category ID).
-      final availableIds = ref.read(categoriesProvider).valueOrNull
-          ?.map((c) => c.id)
-          .toSet() ?? {};
+      final availableIds =
+          ref.read(categoriesProvider).valueOrNull?.map((c) => c.id).toSet() ??
+              {};
       setState(() {
         _suggestion = result;
         if (result != null &&
@@ -117,8 +120,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Selecciona una categoría')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecciona una categoría')));
       return;
     }
     setState(() => _saving = true);
@@ -128,7 +131,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       final paymentMethod = isSimple ? 'cash' : _paymentMethod;
       final desc = _descCtrl.text.trim();
       await dio.post(ApiConstants.expenses, data: {
-        'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+        'amount': parseMoneyInput(_amountCtrl.text),
         'currency': _currency!,
         if (desc.isNotEmpty) 'description': desc,
         'categoryId': _selectedCategoryId,
@@ -225,7 +228,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _amountCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [MoneyInputFormatter()],
                           textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
                             labelText: 'Monto',
@@ -233,7 +238,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           ),
                           validator: (v) {
                             if (v == null || v.isEmpty) return 'Requerido';
-                            final n = double.tryParse(v.replaceAll(',', '.'));
+                            final n = parseMoneyInput(v);
                             if (n == null || n <= 0) return 'Monto inválido';
                             return null;
                           },
@@ -245,10 +250,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         child: SegmentedButton<String>(
                           segments: [
                             ButtonSegment(value: 'HNL', label: Text('L')),
-                            ButtonSegment(value: 'USD', label: Text(currencySymbol('USD'))),
+                            ButtonSegment(
+                                value: 'USD',
+                                label: Text(currencySymbol('USD'))),
                           ],
                           selected: {_currency!},
-                          onSelectionChanged: (s) => setState(() => _currency = s.first),
+                          onSelectionChanged: (s) =>
+                              setState(() => _currency = s.first),
                           style: SegmentedButton.styleFrom(
                             minimumSize: const Size(0, 48),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -262,7 +270,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     controller: _descCtrl,
                     textCapitalization: TextCapitalization.sentences,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+                    decoration: const InputDecoration(
+                        labelText: 'Descripción (opcional)'),
                   ),
                 ],
               ),
@@ -290,44 +299,48 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     loading: () => const LinearProgressIndicator(),
                     error: (_, __) => const Text('Error al cargar categorías'),
                     data: (cats) {
-                    // Guard: ensure value exists in list to avoid Flutter assertion error.
-                    // Backend suggestion may return a parent category ID not in the flat list.
-                    final validId = cats.any((c) => c.id == _selectedCategoryId)
-                        ? _selectedCategoryId
-                        : null;
-                    return DropdownButtonFormField<String>(
-                      value: validId,
-                      decoration: const InputDecoration(labelText: 'Categoría'),
-                      isExpanded: true,
-                      items: cats
-                          .map((c) => DropdownMenuItem(
-                                value: c.id,
-                                child: Row(
-                                  children: [
-                                    Icon(c.iconData, size: 18),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        c.parentName != null ? '${c.parentName} › ${c.name}' : c.name,
-                                        overflow: TextOverflow.ellipsis,
+                      // Guard: ensure value exists in list to avoid Flutter assertion error.
+                      // Backend suggestion may return a parent category ID not in the flat list.
+                      final validId =
+                          cats.any((c) => c.id == _selectedCategoryId)
+                              ? _selectedCategoryId
+                              : null;
+                      return DropdownButtonFormField<String>(
+                        value: validId,
+                        decoration:
+                            const InputDecoration(labelText: 'Categoría'),
+                        isExpanded: true,
+                        items: cats
+                            .map((c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Row(
+                                    children: [
+                                      Icon(c.iconData, size: 18),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          c.parentName != null
+                                              ? '${c.parentName} › ${c.name}'
+                                              : c.name,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() {
-                        _selectedCategoryId = v;
-                        // Show "remember" option when user overrides a suggestion
-                        if (_suggestion != null &&
-                            v != null &&
-                            v != _suggestion!.categoryId) {
-                          _rememberCategory = false;
-                        }
-                      }),
-                      validator: (v) => v == null ? 'Requerido' : null,
-                    );
-                  },
+                                    ],
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          _selectedCategoryId = v;
+                          // Show "remember" option when user overrides a suggestion
+                          if (_suggestion != null &&
+                              v != null &&
+                              v != _suggestion!.categoryId) {
+                            _rememberCategory = false;
+                          }
+                        }),
+                        validator: (v) => v == null ? 'Requerido' : null,
+                      );
+                    },
                   ),
                   // "Remember" checkbox — only shown when user overrides suggestion
                   if (_suggestion != null &&
@@ -337,22 +350,24 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       value: _rememberCategory,
-                      onChanged: (v) => setState(() => _rememberCategory = v ?? false),
+                      onChanged: (v) =>
+                          setState(() => _rememberCategory = v ?? false),
                       title: Text(
                         'Recordar para descripciones similares',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                   if (!isSimple) ...[
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       initialValue: _paymentMethod,
-                      decoration: const InputDecoration(labelText: 'Método de pago'),
+                      decoration:
+                          const InputDecoration(labelText: 'Método de pago'),
                       items: _payMethods.entries
-                          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                          .map((e) => DropdownMenuItem(
+                              value: e.key, child: Text(e.value)))
                           .toList(),
                       onChanged: (v) => setState(() {
                         _paymentMethod = v ?? 'cash';
@@ -369,9 +384,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                               ? Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF9800).withAlpha(20),
+                                    color:
+                                        const Color(0xFFFF9800).withAlpha(20),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFFF9800).withAlpha(80)),
+                                    border: Border.all(
+                                        color: const Color(0xFFFF9800)
+                                            .withAlpha(80)),
                                   ),
                                   child: const Text(
                                     'No tienes tarjetas registradas. Agrégalas en la sección de Tarjetas.',
@@ -382,7 +400,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                                   initialValue: _selectedCreditCardId,
                                   decoration: const InputDecoration(
                                     labelText: 'Tarjeta de crédito',
-                                    prefixIcon: Icon(Icons.credit_card_outlined),
+                                    prefixIcon:
+                                        Icon(Icons.credit_card_outlined),
                                   ),
                                   items: cards
                                       .map((c) => DropdownMenuItem(
@@ -393,7 +412,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                                   onChanged: (v) => setState(() {
                                     _selectedCreditCardId = v;
                                     if (v != null) {
-                                      final card = cards.firstWhere((c) => c.id == v);
+                                      final card =
+                                          cards.firstWhere((c) => c.id == v);
                                       _currency = card.limitCurrency;
                                     }
                                   }),
@@ -424,7 +444,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : const Text('Guardar gasto'),
                   ),
@@ -466,9 +487,7 @@ class _SuggestionChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: alreadyApplied
-            ? null
-            : () => onApply(suggestion.categoryId!),
+        onTap: alreadyApplied ? null : () => onApply(suggestion.categoryId!),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -491,7 +510,8 @@ class _SuggestionChip extends StatelessWidget {
                   alreadyApplied
                       ? 'Auto-detectado: ${suggestion.categoryName}'
                       : 'Sugerida: ${suggestion.categoryName}',
-                  style: theme.textTheme.labelMedium?.copyWith(color: textColor),
+                  style:
+                      theme.textTheme.labelMedium?.copyWith(color: textColor),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

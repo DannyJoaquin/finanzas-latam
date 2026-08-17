@@ -9,6 +9,7 @@ import '../../../../features/cash/providers/cash_provider.dart';
 import '../../../../features/credit_cards/providers/credit_cards_provider.dart';
 import '../../providers/expenses_provider.dart';
 import '../../providers/recurring_expenses_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class RecurringExpensesScreen extends ConsumerStatefulWidget {
   const RecurringExpensesScreen({super.key});
@@ -521,7 +522,7 @@ class _RecurringExpenseFormState extends ConsumerState<_RecurringExpenseForm> {
     final existing = widget.initial;
     _nameCtrl = TextEditingController(text: existing?.name ?? '');
     _amountCtrl = TextEditingController(
-      text: existing == null ? '' : existing.amount.toStringAsFixed(2),
+      text: existing == null ? '' : formatMoneyInputValue(existing.amount),
     );
     _notesCtrl = TextEditingController(text: existing?.notes ?? '');
     _startDate = existing == null
@@ -602,7 +603,7 @@ class _RecurringExpenseFormState extends ConsumerState<_RecurringExpenseForm> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+    final amount = parseMoneyInput(_amountCtrl.text);
     if (amount == null || amount <= 0) return;
     if (_paymentMethod == 'card_credit' && _creditCardId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -708,13 +709,13 @@ class _RecurringExpenseFormState extends ConsumerState<_RecurringExpenseForm> {
                       controller: _amountCtrl,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: 'Monto',
                         prefixText: '${currencySymbol(_currency)} ',
                       ),
                       validator: (value) {
-                        final amount =
-                            double.tryParse(value?.replaceAll(',', '.') ?? '');
+                        final amount = parseMoneyInput(value ?? '');
                         return amount == null || amount <= 0
                             ? 'Monto inválido'
                             : null;

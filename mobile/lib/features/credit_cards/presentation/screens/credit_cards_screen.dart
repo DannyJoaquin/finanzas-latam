@@ -11,18 +11,21 @@ import '../../../../core/constants/currency_format.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../models/credit_card_model.dart';
 import '../../providers/credit_cards_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 // ── Provider: expenses for a specific card ────────────────────────────────────
 
-final _cardExpensesProvider =
-    FutureProvider.autoDispose.family<List<ExpenseModel>, String>((ref, cardId) async {
+final _cardExpensesProvider = FutureProvider.autoDispose
+    .family<List<ExpenseModel>, String>((ref, cardId) async {
   final dio = ref.watch(dioProvider);
   final resp = await dio.get(
     ApiConstants.expenses,
     queryParameters: {'creditCardId': cardId, 'limit': 100},
   );
   final items = resp.data['items'] as List<dynamic>? ?? [];
-  return items.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
+  return items
+      .map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>))
+      .toList();
 });
 
 // ── Currency formatter ────────────────────────────────────────────────────────
@@ -100,8 +103,8 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
     ref.listen<AsyncValue<List<CreditCardSummary>>>(
       creditCardsSummaryProvider,
       (_, next) {
-        next.whenData((cards) =>
-            NotificationService.instance.rescheduleAll(cards));
+        next.whenData(
+            (cards) => NotificationService.instance.rescheduleAll(cards));
       },
     );
 
@@ -194,17 +197,17 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
                     children: [
                       Text(
                         'Tarjetas',
-                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '$monthTitle · ${cards.length} registradas',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -228,7 +231,8 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
                           child: PageView.builder(
                             controller: _pageController,
                             itemCount: cards.length,
-                            onPageChanged: (i) => setState(() => _selectedIndex = i),
+                            onPageChanged: (i) =>
+                                setState(() => _selectedIndex = i),
                             itemBuilder: (_, i) => _CreditCardWidget(
                               card: cards[i],
                               isSelected: i == _selectedIndex,
@@ -246,7 +250,8 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
                                 tooltip: 'Tarjeta anterior',
                                 onPressed: _selectedIndex == 0
                                     ? null
-                                    : () => _goToCard(_selectedIndex - 1, cards.length),
+                                    : () => _goToCard(
+                                        _selectedIndex - 1, cards.length),
                                 icon: const Icon(Icons.chevron_left),
                               ),
                               Text(
@@ -257,7 +262,8 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
                                 tooltip: 'Tarjeta siguiente',
                                 onPressed: _selectedIndex == cards.length - 1
                                     ? null
-                                    : () => _goToCard(_selectedIndex + 1, cards.length),
+                                    : () => _goToCard(
+                                        _selectedIndex + 1, cards.length),
                                 icon: const Icon(Icons.chevron_right),
                               ),
                             ],
@@ -375,7 +381,8 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
     );
   }
 
-  Future<void> _showEditCardSheet(BuildContext context, CreditCardSummary card) async {
+  Future<void> _showEditCardSheet(
+      BuildContext context, CreditCardSummary card) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -392,14 +399,18 @@ class _CreditCardsScreenState extends ConsumerState<CreditCardsScreen> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, CreditCardSummary card) async {
+  Future<void> _confirmDelete(
+      BuildContext context, CreditCardSummary card) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Eliminar tarjeta'),
-        content: Text('¿Eliminar ${card.name}? Los gastos existentes no se borrarán.'),
+        content: Text(
+            '¿Eliminar ${card.name}? Los gastos existentes no se borrarán.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -461,7 +472,8 @@ class _CreditCardWidget extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
-      margin: EdgeInsets.symmetric(horizontal: 12, vertical: isSelected ? 0 : 10),
+      margin:
+          EdgeInsets.symmetric(horizontal: 12, vertical: isSelected ? 0 : 10),
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(22),
@@ -518,7 +530,7 @@ class _CreditCardWidget extends StatelessWidget {
                   ),
                   const Spacer(),
                   // Balance — show each currency separately when mixed
-                  if (card.currentBalanceUSD > 0) ...[  
+                  if (card.currentBalanceUSD > 0) ...[
                     Text(
                       _cardFmt('HNL').format(card.currentBalanceHNL),
                       style: const TextStyle(
@@ -619,10 +631,10 @@ class _ChipPainter extends CustomPainter {
       ..color = const Color(0xFFB8960C).withAlpha(120)
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-        Offset(size.width / 2, 2), Offset(size.width / 2, size.height - 2), paint);
-    canvas.drawLine(
-        Offset(2, size.height / 2), Offset(size.width - 2, size.height / 2), paint);
+    canvas.drawLine(Offset(size.width / 2, 2),
+        Offset(size.width / 2, size.height - 2), paint);
+    canvas.drawLine(Offset(2, size.height / 2),
+        Offset(size.width - 2, size.height / 2), paint);
     canvas.drawRect(
       Rect.fromLTWH(
         size.width * 0.2,
@@ -678,7 +690,8 @@ class _NetworkLogo extends StatelessWidget {
             ),
           ),
         ),
-      _ => Icon(Icons.credit_card, color: Colors.white.withAlpha(200), size: 28),
+      _ =>
+        Icon(Icons.credit_card, color: Colors.white.withAlpha(200), size: 28),
     };
   }
 }
@@ -765,7 +778,8 @@ class _BillingCycleDetail extends StatelessWidget {
         children: [
           Text(
             'Ciclo actual',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           _InfoTile(
@@ -781,7 +795,8 @@ class _BillingCycleDetail extends StatelessWidget {
                 child: _InfoTile(
                   icon: Icons.content_cut_rounded,
                   label: 'Próximo corte',
-                  value: '${card.nextCutOffDate}\n${card.daysUntilCutOff}d restantes',
+                  value:
+                      '${card.nextCutOffDate}\n${card.daysUntilCutOff}d restantes',
                   color: card.daysUntilCutOff <= 3
                       ? const Color(0xFFFF5252)
                       : theme.colorScheme.primary,
@@ -792,8 +807,11 @@ class _BillingCycleDetail extends StatelessWidget {
                 child: _InfoTile(
                   icon: Icons.payment_outlined,
                   label: 'Fecha de pago',
-                  value: '${card.paymentDueDate}\n${card.daysUntilPayment}d restantes',
-                  color: payUrgent ? const Color(0xFFFF5252) : theme.colorScheme.primary,
+                  value:
+                      '${card.paymentDueDate}\n${card.daysUntilPayment}d restantes',
+                  color: payUrgent
+                      ? const Color(0xFFFF5252)
+                      : theme.colorScheme.primary,
                 ),
               ),
             ],
@@ -839,7 +857,8 @@ class _InfoTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        border:
+            Border.all(color: theme.colorScheme.outlineVariant.withAlpha(80)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(8),
@@ -901,7 +920,9 @@ class _UtilizationCard extends StatelessWidget {
     final fmtLimit = fmt;
     final pct = card.utilizationPct ?? 0;
     // Utilization is based on HNL only (USD can't be added without exchange rate)
-    final unpaidOverdueHNL = (card.overdueBalanceHNL - (card.closedCyclePaidAmount ?? 0)).clamp(0.0, double.infinity);
+    final unpaidOverdueHNL =
+        (card.overdueBalanceHNL - (card.closedCyclePaidAmount ?? 0))
+            .clamp(0.0, double.infinity);
     final totalUsedHNL = card.currentBalanceHNL + unpaidOverdueHNL;
     final color = pct > 80
         ? const Color(0xFFEA4335)
@@ -917,7 +938,8 @@ class _UtilizationCard extends StatelessWidget {
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80)),
+              color:
+                  Theme.of(context).colorScheme.outlineVariant.withAlpha(80)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(8),
@@ -1012,10 +1034,14 @@ class _CardStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (text, color, icon) = switch (status) {
-      'paid'    => ('Pagada',    const Color(0xFF34A853), Icons.check_circle_rounded),
-      'partial' => ('Parcial',   const Color(0xFFFF9800), Icons.timelapse_rounded),
-      'unpaid'  => ('Sin pagar', const Color(0xFFEA4335), Icons.cancel_rounded),
-      _         => ('Al día',    const Color(0xFF34A853), Icons.thumb_up_alt_rounded),
+      'paid' => ('Pagada', const Color(0xFF34A853), Icons.check_circle_rounded),
+      'partial' => (
+          'Parcial',
+          const Color(0xFFFF9800),
+          Icons.timelapse_rounded
+        ),
+      'unpaid' => ('Sin pagar', const Color(0xFFEA4335), Icons.cancel_rounded),
+      _ => ('Al día', const Color(0xFF34A853), Icons.thumb_up_alt_rounded),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -1061,13 +1087,38 @@ class _PaymentStatusCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     final (label, subtitle, icon, color) = switch (card.paymentStatus) {
-      'paid'    => ('Pagada',               'Ciclo anterior cubierto',             Icons.check_circle_rounded,  const Color(0xFF34A853)),
-      'partial' => ('Pago parcial',         'Ciclo anterior cubierto parcialmente', Icons.timelapse_rounded,    const Color(0xFFFF9800)),
-      'unpaid'  => ('Sin pagar',            'Ciclo anterior pendiente de pago',    Icons.cancel_rounded,        const Color(0xFFEA4335)),
+      'paid' => (
+          'Pagada',
+          'Ciclo anterior cubierto',
+          Icons.check_circle_rounded,
+          const Color(0xFF34A853)
+        ),
+      'partial' => (
+          'Pago parcial',
+          'Ciclo anterior cubierto parcialmente',
+          Icons.timelapse_rounded,
+          const Color(0xFFFF9800)
+        ),
+      'unpaid' => (
+          'Sin pagar',
+          'Ciclo anterior pendiente de pago',
+          Icons.cancel_rounded,
+          const Color(0xFFEA4335)
+        ),
       // no_debt: current cycle is active, nothing is overdue
-      _         => card.currentBalance > 0
-          ? ('Ciclo activo',    'Ciclo abierto · sin vencimiento aún',  Icons.radio_button_checked, const Color(0xFF5C6BC0))
-          : ('Sin deuda',       'No hay gastos ni cobros pendientes',   Icons.thumb_up_alt_rounded,  const Color(0xFF34A853)),
+      _ => card.currentBalance > 0
+          ? (
+              'Ciclo activo',
+              'Ciclo abierto · sin vencimiento aún',
+              Icons.radio_button_checked,
+              const Color(0xFF5C6BC0)
+            )
+          : (
+              'Sin deuda',
+              'No hay gastos ni cobros pendientes',
+              Icons.thumb_up_alt_rounded,
+              const Color(0xFF34A853)
+            ),
     };
 
     final relevantDebt = card.overdueBalance > 0 ? card.overdueBalance : 0.0;
@@ -1208,7 +1259,8 @@ class _PaymentStatusCard extends StatelessWidget {
             ],
             if (!showProgress) const SizedBox(height: 4),
             // ── Active-cycle payment info (no_debt + lastPayment) ────
-            if (card.paymentStatus == 'no_debt' && card.lastPaymentAmount != null) ...[
+            if (card.paymentStatus == 'no_debt' &&
+                card.lastPaymentAmount != null) ...[
               Divider(height: 1, color: color.withAlpha(40)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
@@ -1217,7 +1269,8 @@ class _PaymentStatusCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF34A853)),
+                        const Icon(Icons.check_circle_outline,
+                            size: 14, color: Color(0xFF34A853)),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -1300,8 +1353,8 @@ class _OverdueWarningCard extends StatelessWidget {
                     '${fmt.format(card.overdueBalance)} · '
                     'Vence ${card.closedCyclePaymentDue} '
                     '(${card.daysUntilClosedPayment}d)',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xCFEA4335)),
+                    style:
+                        const TextStyle(fontSize: 12, color: Color(0xCFEA4335)),
                   ),
                 ],
               ),
@@ -1336,8 +1389,9 @@ class _CardActions extends StatelessWidget {
         : isPartial
             ? 'Completar pago'
             : 'Registrar pago de tarjeta';
-    final btnIcon =
-        isPaid || isPartial ? Icons.add_circle_outline : Icons.check_circle_outline;
+    final btnIcon = isPaid || isPartial
+        ? Icons.add_circle_outline
+        : Icons.check_circle_outline;
     final btnColor = isPaid
         ? const Color(0xFF1E7E34)
         : isPartial
@@ -1417,7 +1471,8 @@ class _CardExpensesSection extends ConsumerWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+          border:
+              Border.all(color: theme.colorScheme.outlineVariant.withAlpha(80)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(8),
@@ -1559,12 +1614,15 @@ class _ExpenseCycleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fmt = _cardFmt(cardCurrency);
-    final totalHNL = expenses.where((e) => e.currency == 'HNL').fold(0.0, (s, e) => s + e.amount);
-    final totalUSD = expenses.where((e) => e.currency == 'USD').fold(0.0, (s, e) => s + e.amount);
+    final totalHNL = expenses
+        .where((e) => e.currency == 'HNL')
+        .fold(0.0, (s, e) => s + e.amount);
+    final totalUSD = expenses
+        .where((e) => e.currency == 'USD')
+        .fold(0.0, (s, e) => s + e.amount);
     final total = totalHNL + totalUSD;
-    final labelColor = dimmed
-        ? theme.colorScheme.onSurfaceVariant
-        : theme.colorScheme.primary;
+    final labelColor =
+        dimmed ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary;
 
     return Opacity(
       opacity: dimmed ? 0.75 : 1.0,
@@ -1610,7 +1668,8 @@ class _ExpenseCycleSection extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: Text(
                 'Sin gastos en este ciclo',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                    fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
             )
           else ...[
@@ -1629,7 +1688,8 @@ class _ExpenseCycleSection extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                   leading: CircleAvatar(
                     radius: 18,
-                    backgroundColor: AppColors.expense.withAlpha(dimmed ? 10 : 20),
+                    backgroundColor:
+                        AppColors.expense.withAlpha(dimmed ? 10 : 20),
                     child: isEmoji
                         ? Text(e.categoryIcon,
                             style: const TextStyle(fontSize: 14))
@@ -1667,7 +1727,8 @@ class _ExpenseCycleSection extends StatelessWidget {
             if (expenses.length > 5) ...[
               const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
                   '+ ${expenses.length - 5} gastos más',
                   style: TextStyle(
@@ -1762,7 +1823,8 @@ class _EmptyState extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.credit_card, color: Colors.white, size: 36),
+              child:
+                  const Icon(Icons.credit_card, color: Colors.white, size: 36),
             ),
             const SizedBox(height: 24),
             Text(
@@ -1807,8 +1869,7 @@ class _RegisterPaymentSheet extends ConsumerStatefulWidget {
       _RegisterPaymentSheetState();
 }
 
-class _RegisterPaymentSheetState
-    extends ConsumerState<_RegisterPaymentSheet> {
+class _RegisterPaymentSheetState extends ConsumerState<_RegisterPaymentSheet> {
   final _amountCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   DateTime _paymentDate = DateTime.now();
@@ -1830,7 +1891,7 @@ class _RegisterPaymentSheetState
       defaultAmount = card.currentBalanceHNL;
     }
     if (defaultAmount > 0) {
-      _amountCtrl.text = defaultAmount.toStringAsFixed(0);
+      _amountCtrl.text = formatMoneyInputValue(defaultAmount, decimalDigits: 0);
     }
   }
 
@@ -1841,10 +1902,8 @@ class _RegisterPaymentSheetState
     super.dispose();
   }
 
-  String get _cycleStart =>
-      card.closedCycleStart ?? card.currentCycleStart;
-  String get _cycleEnd =>
-      card.closedCycleEnd ?? card.currentCycleEnd;
+  String get _cycleStart => card.closedCycleStart ?? card.currentCycleStart;
+  String get _cycleEnd => card.closedCycleEnd ?? card.currentCycleEnd;
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -1858,8 +1917,7 @@ class _RegisterPaymentSheetState
   }
 
   Future<void> _save() async {
-    final raw = _amountCtrl.text.trim().replaceAll(',', '.');
-    final amount = double.tryParse(raw);
+    final amount = parseMoneyInput(_amountCtrl.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ingresa un monto válido')),
@@ -1976,8 +2034,7 @@ class _RegisterPaymentSheetState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withAlpha(120),
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -2003,8 +2060,8 @@ class _RegisterPaymentSheetState
                 decoration: BoxDecoration(
                   color: const Color(0xFFEA4335).withAlpha(14),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: const Color(0xFFEA4335).withAlpha(80)),
+                  border:
+                      Border.all(color: const Color(0xFFEA4335).withAlpha(80)),
                 ),
                 child: Row(
                   children: [
@@ -2033,13 +2090,14 @@ class _RegisterPaymentSheetState
               controller: _amountCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [MoneyInputFormatter()],
               decoration: InputDecoration(
                 labelText: 'Monto pagado (${currencySymbol('HNL')})',
                 hintText: '0',
                 prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                 prefixText: '${currencySymbol('HNL')} ',
                 helperText: card.overdueBalanceUSD > 0
-                  ? 'La deuda en dólares se registra por separado: ${currencyFmt('USD').format(card.overdueBalanceUSD)}'
+                    ? 'La deuda en dólares se registra por separado: ${currencyFmt('USD').format(card.overdueBalanceUSD)}'
                     : null,
               ),
             ),
@@ -2131,7 +2189,8 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
       _cutOffDay = e.cutOffDay;
       _paymentDueDays = e.paymentDueDays;
       if (e.creditLimit != null) {
-        _limitCtrl.text = e.creditLimit!.toStringAsFixed(0);
+        _limitCtrl.text =
+            formatMoneyInputValue(e.creditLimit!, decimalDigits: 0);
       }
       _limitCurrency = e.limitCurrency;
     }
@@ -2155,12 +2214,12 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
         'cutOffDay': _cutOffDay,
         'paymentDueDays': _paymentDueDays,
         if (_limitCtrl.text.isNotEmpty)
-          'creditLimit': double.parse(_limitCtrl.text.replaceAll(',', '.')),
+          'creditLimit': parseMoneyInput(_limitCtrl.text),
         if (_limitCtrl.text.isNotEmpty) 'limitCurrency': _limitCurrency,
       };
       if (widget.editCard != null) {
-        await dio.patch(
-            '${ApiConstants.creditCards}/${widget.editCard!.id}', data: data);
+        await dio.patch('${ApiConstants.creditCards}/${widget.editCard!.id}',
+            data: data);
       } else {
         await dio.post(ApiConstants.creditCards, data: data);
       }
@@ -2255,9 +2314,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer,
+                          color: Theme.of(context).colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -2278,8 +2335,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                     max: 28,
                     divisions: 27,
                     label: '$_cutOffDay',
-                    onChanged: (v) =>
-                        setState(() => _cutOffDay = v.round()),
+                    onChanged: (v) => setState(() => _cutOffDay = v.round()),
                   ),
                 ],
               ),
@@ -2296,9 +2352,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer,
+                          color: Theme.of(context).colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -2333,6 +2387,7 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                       controller: _limitCtrl,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [MoneyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: 'Límite de crédito (opcional)',
                         prefixText: '${currencySymbol(_limitCurrency)} ',
@@ -2347,7 +2402,8 @@ class _AddCardSheetState extends ConsumerState<_AddCardSheet> {
                     child: SegmentedButton<String>(
                       segments: [
                         ButtonSegment(value: 'HNL', label: Text('L')),
-                        ButtonSegment(value: 'USD', label: Text(currencySymbol('USD'))),
+                        ButtonSegment(
+                            value: 'USD', label: Text(currencySymbol('USD'))),
                       ],
                       selected: {_limitCurrency},
                       onSelectionChanged: (v) =>

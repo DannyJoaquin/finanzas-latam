@@ -9,6 +9,7 @@ import '../../models/shared_expense_model.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../core/constants/currency_format.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class AddSharedExpenseScreen extends ConsumerStatefulWidget {
   const AddSharedExpenseScreen({
@@ -24,7 +25,8 @@ class AddSharedExpenseScreen extends ConsumerStatefulWidget {
       _AddSharedExpenseScreenState();
 }
 
-class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen> {
+class _AddSharedExpenseScreenState
+    extends ConsumerState<AddSharedExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descCtrl = TextEditingController();
   final _totalCtrl = TextEditingController();
@@ -74,7 +76,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
     if (exp != null) {
       // Edit mode — pre-populate
       _descCtrl.text = exp.description;
-      _totalCtrl.text = exp.totalAmount.toStringAsFixed(2);
+      _totalCtrl.text = formatMoneyInputValue(exp.totalAmount);
       _noteCtrl.text = exp.note ?? '';
       _date = exp.date;
       _payerId = exp.payerId;
@@ -95,7 +97,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
       for (final p in exp.participants) {
         _customAmounts.putIfAbsent(p.userId, () => TextEditingController());
         _percentAmounts.putIfAbsent(p.userId, () => TextEditingController());
-        _customAmounts[p.userId]!.text = p.shareAmount.toStringAsFixed(2);
+        _customAmounts[p.userId]!.text = formatMoneyInputValue(p.shareAmount);
         if (exp.totalAmount > 0) {
           final pct = (p.shareAmount / exp.totalAmount) * 100;
           _percentAmounts[p.userId]!.text = pct.toStringAsFixed(1);
@@ -115,9 +117,11 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
   void _onCustomAmountChanged(String userId, List<SharedMemberModel> members) {
     _lockedParticipants.add(userId);
 
-    final total = double.tryParse(_totalCtrl.text) ?? 0;
-    final selected = members.where((m) => _selectedParticipants.contains(m.userId)).toList();
-    final unlocked = selected.where((m) => !_lockedParticipants.contains(m.userId)).toList();
+    final total = parseMoneyInput(_totalCtrl.text) ?? 0;
+    final selected =
+        members.where((m) => _selectedParticipants.contains(m.userId)).toList();
+    final unlocked =
+        selected.where((m) => !_lockedParticipants.contains(m.userId)).toList();
 
     if (unlocked.isEmpty) {
       setState(() {});
@@ -126,8 +130,13 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
 
     // B1 fix: also filter locked participants by _selectedParticipants
     final lockedSum = _lockedParticipants
-        .where((id) => _customAmounts.containsKey(id) && _selectedParticipants.contains(id))
-        .fold(0.0, (sum, id) => sum + (double.tryParse(_customAmounts[id]!.text) ?? 0));
+        .where((id) =>
+            _customAmounts.containsKey(id) &&
+            _selectedParticipants.contains(id))
+        .fold(
+            0.0,
+            (sum, id) =>
+                sum + (double.tryParse(_customAmounts[id]!.text) ?? 0));
 
     final remaining = total - lockedSum;
     final share = remaining / unlocked.length;
@@ -144,8 +153,10 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
   void _onPercentChanged(String userId, List<SharedMemberModel> members) {
     _lockedPercents.add(userId);
 
-    final selected = members.where((m) => _selectedParticipants.contains(m.userId)).toList();
-    final unlocked = selected.where((m) => !_lockedPercents.contains(m.userId)).toList();
+    final selected =
+        members.where((m) => _selectedParticipants.contains(m.userId)).toList();
+    final unlocked =
+        selected.where((m) => !_lockedPercents.contains(m.userId)).toList();
 
     if (unlocked.isEmpty) {
       setState(() {});
@@ -153,8 +164,13 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
     }
 
     final lockedPct = _lockedPercents
-        .where((id) => _percentAmounts.containsKey(id) && _selectedParticipants.contains(id))
-        .fold(0.0, (sum, id) => sum + (double.tryParse(_percentAmounts[id]!.text) ?? 0));
+        .where((id) =>
+            _percentAmounts.containsKey(id) &&
+            _selectedParticipants.contains(id))
+        .fold(
+            0.0,
+            (sum, id) =>
+                sum + (double.tryParse(_percentAmounts[id]!.text) ?? 0));
 
     final remaining = 100.0 - lockedPct;
     final share = remaining / unlocked.length;
@@ -166,22 +182,31 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
     setState(() {});
   }
 
-  List<Map<String, dynamic>> _buildParticipants(List<SharedMemberModel> members) {
-    final selected = members.where((m) => _selectedParticipants.contains(m.userId)).toList();
+  List<Map<String, dynamic>> _buildParticipants(
+      List<SharedMemberModel> members) {
+    final selected =
+        members.where((m) => _selectedParticipants.contains(m.userId)).toList();
     if (selected.isEmpty) return [];
 
-    final total = double.tryParse(_totalCtrl.text) ?? 0;
+    final total = parseMoneyInput(_totalCtrl.text) ?? 0;
 
     if (_splitMode == 'equal') {
       final share = selected.isEmpty ? 0.0 : total / selected.length;
       return selected
-          .map((m) => {'userId': m.userId, 'shareAmount': double.parse(share.toStringAsFixed(2))})
+          .map((m) => {
+                'userId': m.userId,
+                'shareAmount': double.parse(share.toStringAsFixed(2))
+              })
           .toList();
     } else if (_splitMode == 'percent') {
       return selected.map((m) {
-        final pct = double.tryParse(_percentAmounts[m.userId]?.text ?? '0') ?? 0;
+        final pct =
+            double.tryParse(_percentAmounts[m.userId]?.text ?? '0') ?? 0;
         final amt = total * pct / 100;
-        return {'userId': m.userId, 'shareAmount': double.parse(amt.toStringAsFixed(2))};
+        return {
+          'userId': m.userId,
+          'shareAmount': double.parse(amt.toStringAsFixed(2))
+        };
       }).toList();
     } else {
       // 'amount'
@@ -194,7 +219,8 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
 
   double _previewSum(List<SharedMemberModel> members) {
     final participants = _buildParticipants(members);
-    return participants.fold(0.0, (acc, p) => acc + (p['shareAmount'] as double));
+    return participants.fold(
+        0.0, (acc, p) => acc + (p['shareAmount'] as double));
   }
 
   Future<void> _submit(List<SharedMemberModel> members, String currency) async {
@@ -213,8 +239,9 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
     }
 
     final participants = _buildParticipants(members);
-    final total = double.parse(_totalCtrl.text);
-    final sum = participants.fold(0.0, (a, p) => a + (p['shareAmount'] as double));
+    final total = parseMoneyInput(_totalCtrl.text) ?? 0;
+    final sum =
+        participants.fold(0.0, (a, p) => a + (p['shareAmount'] as double));
     if ((sum - total).abs() > 0.01) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -282,16 +309,17 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.initialExpense != null ? 'Editar gasto' : 'Agregar gasto compartido'),
+        title: Text(widget.initialExpense != null
+            ? 'Editar gasto'
+            : 'Agregar gasto compartido'),
         centerTitle: false,
       ),
       body: groupAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => AppErrorWidget(error: e, onRetry: () {}),
         data: (group) {
-          final members = group.members
-              .where((m) => m.status == 'active')
-              .toList();
+          final members =
+              group.members.where((m) => m.status == 'active').toList();
           _initParticipants(members);
 
           return Form(
@@ -307,24 +335,28 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                     prefixIcon: Icon(Icons.receipt_outlined),
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Ingresa una descripción' : null,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Ingresa una descripción'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 // ── Total Amount ──
                 TextFormField(
                   controller: _totalCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Monto total (${currencySymbol(group.currency)})',
+                    labelText:
+                        'Monto total (${currencySymbol(group.currency)})',
                     prefixIcon: Icon(Icons.account_balance_wallet_outlined),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [MoneyInputFormatter()],
                   onChanged: (_) => setState(() {
                     _lockedParticipants.clear();
                   }),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Ingresa el monto';
-                    final parsed = double.tryParse(v);
+                    final parsed = parseMoneyInput(v);
                     if (parsed == null || parsed <= 0) return 'Monto inválido';
                     return null;
                   },
@@ -350,7 +382,8 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 const Divider(),
                 // ── Payer Selector ──
                 Text('¿Quién pagó?',
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -368,14 +401,16 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 Row(
                   children: [
                     Text('Participantes',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     const Spacer(),
                     TextButton(
                       onPressed: () => setState(() {
                         if (_selectedParticipants.length == members.length) {
                           _selectedParticipants = [];
                         } else {
-                          _selectedParticipants = members.map((m) => m.userId).toList();
+                          _selectedParticipants =
+                              members.map((m) => m.userId).toList();
                         }
                       }),
                       child: Text(
@@ -409,7 +444,8 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 Row(
                   children: [
                     Text('División',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     const Spacer(),
                     SegmentedButton<String>(
                       segments: const [
@@ -444,8 +480,11 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                                 labelText: m.fullName,
                                 suffixText: '%',
                               ),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              onChanged: (_) => _onPercentChanged(m.userId, members),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              onChanged: (_) =>
+                                  _onPercentChanged(m.userId, members),
                             ),
                           ))
                       .toList(),
@@ -461,16 +500,22 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                               controller: _customAmounts[m.userId],
                               decoration: InputDecoration(
                                 labelText: m.fullName,
-                                prefixText: '${currencySymbol(group.currency)} ',
+                                prefixText:
+                                    '${currencySymbol(group.currency)} ',
                               ),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              onChanged: (_) => _onCustomAmountChanged(m.userId, members),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              inputFormatters: [MoneyInputFormatter()],
+                              onChanged: (_) =>
+                                  _onCustomAmountChanged(m.userId, members),
                             ),
                           ))
                       .toList(),
                 ],
                 // ── Preview live ──
-                if (_selectedParticipants.isNotEmpty && (_totalCtrl.text.isNotEmpty)) ...[
+                if (_selectedParticipants.isNotEmpty &&
+                    (_totalCtrl.text.isNotEmpty)) ...[
                   const SizedBox(height: 16),
                   _SplitPreview(
                     members: members
@@ -478,7 +523,7 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                         .toList(),
                     participants: _buildParticipants(members),
                     payerId: _payerId,
-                    total: double.tryParse(_totalCtrl.text) ?? 0,
+                    total: parseMoneyInput(_totalCtrl.text) ?? 0,
                     sum: _previewSum(members),
                     currency: group.currency,
                   ),
@@ -497,7 +542,8 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 // ── Recurring expense ──
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -514,8 +560,10 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                         if (_isRecurring) ...[
                           SegmentedButton<String>(
                             segments: const [
-                              ButtonSegment(value: 'monthly', label: Text('Mensual')),
-                              ButtonSegment(value: 'weekly', label: Text('Semanal')),
+                              ButtonSegment(
+                                  value: 'monthly', label: Text('Mensual')),
+                              ButtonSegment(
+                                  value: 'weekly', label: Text('Semanal')),
                             ],
                             selected: {_recurringInterval ?? 'monthly'},
                             onSelectionChanged: (s) => setState(
@@ -551,10 +599,17 @@ class _AddSharedExpenseScreenState extends ConsumerState<AddSharedExpenseScreen>
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: _loading ? null : () => _submit(members, group.currency),
+                  onPressed:
+                      _loading ? null : () => _submit(members, group.currency),
                   child: _loading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(widget.initialExpense != null ? 'Guardar cambios' : 'Guardar gasto'),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text(widget.initialExpense != null
+                          ? 'Guardar cambios'
+                          : 'Guardar gasto'),
                 ),
               ],
             ),
@@ -589,10 +644,15 @@ class _SplitPreview extends StatelessWidget {
     final isValid = diff <= 0.01;
     final theme = Theme.of(context);
     final statusColor = isValid
-        ? (theme.brightness == Brightness.dark ? Colors.green.shade300 : Colors.green.shade800)
-        : (theme.brightness == Brightness.dark ? Colors.orange.shade300 : Colors.orange.shade800);
+        ? (theme.brightness == Brightness.dark
+            ? Colors.green.shade300
+            : Colors.green.shade800)
+        : (theme.brightness == Brightness.dark
+            ? Colors.orange.shade300
+            : Colors.orange.shade800);
     final statusBackground = Color.alphaBlend(
-      statusColor.withValues(alpha: theme.brightness == Brightness.dark ? 0.16 : 0.08),
+      statusColor.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.16 : 0.08),
       theme.colorScheme.surfaceContainerLow,
     );
 
@@ -611,7 +671,9 @@ class _SplitPreview extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isValid ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+                isValid
+                    ? Icons.check_circle_outline
+                    : Icons.warning_amber_outlined,
                 size: 16,
                 color: statusColor,
               ),
@@ -628,7 +690,8 @@ class _SplitPreview extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ...participants.map((p) {
-            final member = members.where((m) => m.userId == p['userId']).firstOrNull;
+            final member =
+                members.where((m) => m.userId == p['userId']).firstOrNull;
             final name = member?.fullName ?? p['userId'];
             final isPayer = p['userId'] == payerId;
             final shareAmt = (p['shareAmount'] as double);

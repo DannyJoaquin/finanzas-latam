@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/router/app_router.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 //  Domain models
@@ -82,8 +83,7 @@ class _LoanCalculatorScreenState extends State<LoanCalculatorScreen> {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
-    final amount =
-        double.parse(_amountCtrl.text.replaceAll(',', '').replaceAll(' ', ''));
+    final amount = parseMoneyInput(_amountCtrl.text)!;
     final annualRate = double.parse(_rateCtrl.text.replaceAll(',', '.'));
     final termInput = int.parse(_termCtrl.text.trim());
     final n = _termInMonths ? termInput : termInput * 12;
@@ -281,8 +281,8 @@ class _InputCard extends StatelessWidget {
           // Monto
           TextFormField(
             controller: amountCtrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [MoneyInputFormatter()],
             decoration: InputDecoration(
               labelText: 'Monto del préstamo',
               hintText: '100,000',
@@ -408,8 +408,6 @@ class _InputCard extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 20),
-
           // Calcular button
           SizedBox(
             width: double.infinity,

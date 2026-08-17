@@ -12,6 +12,7 @@ import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../models/cash_models.dart';
 import '../../providers/cash_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class CashScreen extends ConsumerWidget {
   const CashScreen({super.key});
@@ -29,15 +30,18 @@ class CashScreen extends ConsumerWidget {
       ),
       body: accountsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(cashAccountsProvider)),
+        error: (e, _) => AppErrorWidget(
+            error: e, onRetry: () => ref.invalidate(cashAccountsProvider)),
         data: (accounts) {
           if (accounts.isEmpty) {
-            return _EmptyState(onCreated: () => ref.invalidate(cashAccountsProvider));
+            return _EmptyState(
+                onCreated: () => ref.invalidate(cashAccountsProvider));
           }
           // Show the default account, or the first one
-          final account =
-              accounts.firstWhere((a) => a.isDefault, orElse: () => accounts.first);
-          return _AccountView(account: account, allAccounts: accounts, monthTitle: monthTitle);
+          final account = accounts.firstWhere((a) => a.isDefault,
+              orElse: () => accounts.first);
+          return _AccountView(
+              account: account, allAccounts: accounts, monthTitle: monthTitle);
         },
       ),
     );
@@ -112,7 +116,8 @@ class _EmptyStateState extends ConsumerState<_EmptyState> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.add),
               label: const Text('Crear cartera de efectivo'),
@@ -127,7 +132,10 @@ class _EmptyStateState extends ConsumerState<_EmptyState> {
 // ── Account view ──────────────────────────────────────────────────────────────
 
 class _AccountView extends ConsumerWidget {
-  const _AccountView({required this.account, required this.allAccounts, required this.monthTitle});
+  const _AccountView(
+      {required this.account,
+      required this.allAccounts,
+      required this.monthTitle});
   final CashAccountModel account;
   final List<CashAccountModel> allAccounts;
   final String monthTitle;
@@ -155,10 +163,8 @@ class _AccountView extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             '$monthTitle · Cuenta principal',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           // ── Wallet card ──
@@ -170,7 +176,8 @@ class _AccountView extends ConsumerWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => _showOperationSheet(context, ref, account, 'deposit'),
+                  onPressed: () =>
+                      _showOperationSheet(context, ref, account, 'deposit'),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Depositar'),
                 ),
@@ -178,7 +185,8 @@ class _AccountView extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showOperationSheet(context, ref, account, 'withdraw'),
+                  onPressed: () =>
+                      _showOperationSheet(context, ref, account, 'withdraw'),
                   icon: const Icon(Icons.remove, size: 18),
                   label: const Text('Retirar'),
                 ),
@@ -190,7 +198,8 @@ class _AccountView extends ConsumerWidget {
           // ── Transactions ──
           Text(
             'Movimientos',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           txAsync.when(
@@ -207,7 +216,8 @@ class _AccountView extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Column(
                     children: [
-                      Icon(Icons.receipt_long_outlined, size: 40, color: Colors.grey.shade400),
+                      Icon(Icons.receipt_long_outlined,
+                          size: 40, color: Colors.grey.shade400),
                       const SizedBox(height: 8),
                       Text(
                         'Sin movimientos aún',
@@ -226,7 +236,8 @@ class _AccountView extends ConsumerWidget {
                     onTap: tx.type == 'spend'
                         ? () => context.go(AppRoutes.expenses)
                         : canEdit
-                            ? () => _showTransactionEditor(context, ref, account, tx)
+                            ? () => _showTransactionEditor(
+                                context, ref, account, tx)
                             : null,
                   );
                 }).toList(),
@@ -364,13 +375,13 @@ class _WalletCard extends StatelessWidget {
 // ── Transaction tile ──────────────────────────────────────────────────────────
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.tx, required this.currency, this.onTap});
+  const _TransactionTile(
+      {required this.tx, required this.currency, this.onTap});
   final CashTransactionModel tx;
   final String currency;
   final VoidCallback? onTap;
 
-  bool get _isCredit =>
-      tx.type == 'deposit' || tx.type == 'receive_transfer';
+  bool get _isCredit => tx.type == 'deposit' || tx.type == 'receive_transfer';
 
   IconData get _icon {
     return switch (tx.type) {
@@ -421,42 +432,44 @@ class _TransactionTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withAlpha(25),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(_icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tx.description.isNotEmpty ? tx.description : _label,
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    tx.date,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  child: Icon(_icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tx.description.isNotEmpty ? tx.description : _label,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        tx.date,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            Text(
-              '${_isCredit ? '+' : '-'}${fmt.format(tx.amount)}',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
+                ),
+                Text(
+                  '${_isCredit ? '+' : '-'}${fmt.format(tx.amount)}',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ),
           ),
@@ -505,15 +518,17 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
       final endpoint =
           '${ApiConstants.cashAccounts}/${widget.account.id}/${widget.operation}';
       await dio.post(endpoint, data: {
-        'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
-        if (_descCtrl.text.trim().isNotEmpty) 'description': _descCtrl.text.trim(),
+        'amount': parseMoneyInput(_amountCtrl.text),
+        if (_descCtrl.text.trim().isNotEmpty)
+          'description': _descCtrl.text.trim(),
       });
       widget.onDone();
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isDeposit ? 'Depósito registrado' : 'Retiro registrado'),
+            content:
+                Text(_isDeposit ? 'Depósito registrado' : 'Retiro registrado'),
           ),
         );
       }
@@ -559,7 +574,9 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
             const SizedBox(height: 20),
             TextFormField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [MoneyInputFormatter()],
               decoration: InputDecoration(
                 labelText: 'Monto (${currencySymbol(widget.account.currency)})',
                 prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
@@ -567,7 +584,7 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Requerido';
-                final n = double.tryParse(v.replaceAll(',', '.'));
+                final n = parseMoneyInput(v);
                 if (n == null || n <= 0) return 'Monto inválido';
                 return null;
               },
@@ -588,7 +605,8 @@ class _OperationSheetState extends ConsumerState<_OperationSheet> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : Text(title),
             ),
@@ -611,7 +629,8 @@ class _EditTransactionSheet extends ConsumerStatefulWidget {
   final VoidCallback onDone;
 
   @override
-  ConsumerState<_EditTransactionSheet> createState() => _EditTransactionSheetState();
+  ConsumerState<_EditTransactionSheet> createState() =>
+      _EditTransactionSheetState();
 }
 
 class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
@@ -628,9 +647,10 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
   void initState() {
     super.initState();
     _amountCtrl = TextEditingController(
-      text: widget.transaction.amount.toStringAsFixed(2),
+      text: formatMoneyInputValue(widget.transaction.amount),
     );
-    _descriptionCtrl = TextEditingController(text: widget.transaction.description);
+    _descriptionCtrl =
+        TextEditingController(text: widget.transaction.description);
     _date = DateTime.tryParse(widget.transaction.date) ?? DateTime.now();
   }
 
@@ -660,7 +680,7 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
       await dio.patch(
         ApiConstants.cashTransaction(widget.account.id, widget.transaction.id),
         data: {
-          'amount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+          'amount': parseMoneyInput(_amountCtrl.text),
           'description': _descriptionCtrl.text.trim(),
           'date': _date.toIso8601String().split('T').first,
         },
@@ -746,7 +766,8 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+                    child: Text(title,
+                        style: Theme.of(context).textTheme.titleLarge),
                   ),
                   IconButton(
                     tooltip: 'Eliminar movimiento',
@@ -764,14 +785,17 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: 'Monto (${currencySymbol(widget.account.currency)})',
+                  labelText:
+                      'Monto (${currencySymbol(widget.account.currency)})',
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                   prefixText: '${currencySymbol(widget.account.currency)} ',
                 ),
                 validator: (value) {
-                  final amount = double.tryParse(value?.replaceAll(',', '.') ?? '');
+                  final amount = parseMoneyInput(value ?? '');
+
                   if (amount == null || amount <= 0) return 'Monto inválido';
                   return null;
                 },
@@ -804,7 +828,8 @@ class _EditTransactionSheetState extends ConsumerState<_EditTransactionSheet> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Guardar cambios'),
               ),

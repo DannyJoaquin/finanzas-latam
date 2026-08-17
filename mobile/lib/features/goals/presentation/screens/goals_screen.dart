@@ -9,6 +9,7 @@ import '../../../../core/constants/currency_format.dart';
 import '../../../../core/presentation/widgets/app_error_widget.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class GoalModel {
   const GoalModel({
@@ -29,8 +30,10 @@ class GoalModel {
   final String status;
   final String icon;
 
-  double get progress => targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0.0;
-  double get remaining => (targetAmount - currentAmount).clamp(0.0, double.infinity);
+  double get progress =>
+      targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0.0;
+  double get remaining =>
+      (targetAmount - currentAmount).clamp(0.0, double.infinity);
 
   factory GoalModel.fromJson(Map<String, dynamic> j) => GoalModel(
         id: j['id'] as String,
@@ -49,7 +52,9 @@ final goalsProvider = FutureProvider.autoDispose<List<GoalModel>>((ref) async {
   final dio = ref.watch(dioProvider);
   final resp = await dio.get(ApiConstants.goals);
   final items = resp.data as List<dynamic>? ?? [];
-  return items.map((e) => GoalModel.fromJson(e as Map<String, dynamic>)).toList();
+  return items
+      .map((e) => GoalModel.fromJson(e as Map<String, dynamic>))
+      .toList();
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -77,7 +82,8 @@ class GoalsScreen extends ConsumerWidget {
       ),
       body: goalsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorWidget(error: e, onRetry: () => ref.invalidate(goalsProvider)),
+        error: (e, _) => AppErrorWidget(
+            error: e, onRetry: () => ref.invalidate(goalsProvider)),
         data: (goals) => goals.isEmpty
             ? const Center(
                 child: Text(
@@ -92,14 +98,19 @@ class GoalsScreen extends ConsumerWidget {
                   itemCount: goals.length + 1,
                   itemBuilder: (_, i) {
                     if (i == 0) {
-                      final totalTarget = goals.fold<double>(0, (s, g) => s + g.targetAmount);
-                      final totalSaved = goals.fold<double>(0, (s, g) => s + g.currentAmount);
+                      final totalTarget =
+                          goals.fold<double>(0, (s, g) => s + g.targetAmount);
+                      final totalSaved =
+                          goals.fold<double>(0, (s, g) => s + g.currentAmount);
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Metas',
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
                           ),
@@ -109,7 +120,10 @@ class GoalsScreen extends ConsumerWidget {
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
-                                ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                           ),
                           const SizedBox(height: 12),
                           Padding(
@@ -118,11 +132,15 @@ class GoalsScreen extends ConsumerWidget {
                               width: double.infinity,
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Theme.of(context).shadowColor.withAlpha(14),
+                                    color: Theme.of(context)
+                                        .shadowColor
+                                        .withAlpha(14),
                                     blurRadius: 20,
                                     offset: const Offset(0, 7),
                                   ),
@@ -133,23 +151,37 @@ class GoalsScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     'Ahorro acumulado',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
                                         ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     '${fmt.format(totalSaved)} / ${fmt.format(totalTarget)}',
                                     style: (isSimple
-                                            ? Theme.of(context).textTheme.headlineMedium
-                                            : Theme.of(context).textTheme.headlineSmall)
+                                            ? Theme.of(context)
+                                                .textTheme
+                                                .headlineMedium
+                                            : Theme.of(context)
+                                                .textTheme
+                                                .headlineSmall)
                                         ?.copyWith(fontWeight: FontWeight.w800),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     '${goals.length} metas activas',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
                                         ),
                                   ),
                                 ],
@@ -161,7 +193,8 @@ class GoalsScreen extends ConsumerWidget {
                     }
 
                     final g = goals[i - 1];
-                    final pctLabel = '${(g.progress * 100).toStringAsFixed(0)}%';
+                    final pctLabel =
+                        '${(g.progress * 100).toStringAsFixed(0)}%';
                     final itemRadius = isSimple ? 24.0 : 22.0;
                     final iconSize = isSimple ? 60.0 : 50.0;
 
@@ -172,7 +205,8 @@ class GoalsScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(itemRadius),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context).shadowColor.withAlpha(14),
+                              color:
+                                  Theme.of(context).shadowColor.withAlpha(14),
                               blurRadius: 20,
                               offset: const Offset(0, 6),
                             ),
@@ -181,11 +215,14 @@ class GoalsScreen extends ConsumerWidget {
                         child: _AnimatedCardEntry(
                           index: i,
                           child: Material(
-                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
                             borderRadius: BorderRadius.circular(itemRadius),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(itemRadius),
-                              onTap: () => _showGoalActionsSheet(context, ref, g),
+                              onTap: () =>
+                                  _showGoalActionsSheet(context, ref, g),
                               child: Padding(
                                 padding: EdgeInsets.all(isSimple ? 20 : 16),
                                 child: Column(
@@ -197,30 +234,42 @@ class GoalsScreen extends ConsumerWidget {
                                           width: iconSize,
                                           height: iconSize,
                                           decoration: BoxDecoration(
-                                            color: AppColors.secondary.withAlpha(18),
-                                            borderRadius: BorderRadius.circular(isSimple ? 18 : 16),
+                                            color: AppColors.secondary
+                                                .withAlpha(18),
+                                            borderRadius: BorderRadius.circular(
+                                                isSimple ? 18 : 16),
                                           ),
                                           alignment: Alignment.center,
                                           child: Text(
-                                            g.icon == '' || g.icon.isEmpty ? '🎯' : g.icon,
-                                            style: TextStyle(fontSize: isSimple ? 32 : 26),
+                                            g.icon == '' || g.icon.isEmpty
+                                                ? '🎯'
+                                                : g.icon,
+                                            style: TextStyle(
+                                                fontSize: isSimple ? 32 : 26),
                                           ),
                                         ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(g.name,
                                                   style: TextStyle(
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: isSimple ? 22 : 18)),
-                                              if (g.targetDate != null && g.targetDate!.isNotEmpty)
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize:
+                                                          isSimple ? 22 : 18)),
+                                              if (g.targetDate != null &&
+                                                  g.targetDate!.isNotEmpty)
                                                 Text(
                                                   'Meta: ${g.targetDate}',
                                                   style: TextStyle(
-                                                    fontSize: isSimple ? 13 : 11,
-                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                    fontSize:
+                                                        isSimple ? 13 : 11,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
                                                   ),
                                                 ),
                                             ],
@@ -235,8 +284,11 @@ class GoalsScreen extends ConsumerWidget {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        Icon(Icons.chevron_right, size: 18,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                        Icon(Icons.chevron_right,
+                                            size: 18,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
@@ -246,30 +298,40 @@ class GoalsScreen extends ConsumerWidget {
                                         value: g.progress,
                                         minHeight: isSimple ? 12 : 10,
                                         color: AppColors.secondary,
-                                        backgroundColor:
-                                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
                                       ),
                                     ),
                                     const SizedBox(height: 8),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Ahorrado: ${fmt.format(g.currentAmount)}',
+                                        Text(
+                                            'Ahorrado: ${fmt.format(g.currentAmount)}',
                                             style: TextStyle(
                                                 fontSize: isSimple ? 14 : 12,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                        Text('Falta: ${fmt.format(g.remaining)}',
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant)),
+                                        Text(
+                                            'Falta: ${fmt.format(g.remaining)}',
                                             style: TextStyle(
                                                 fontSize: isSimple ? 14 : 12,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant)),
                                       ],
                                     ),
                                     const SizedBox(height: 10),
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _showContributeDialog(context, ref, g),
-                                        icon: const Icon(Icons.savings_outlined, size: 16),
+                                        onPressed: () => _showContributeDialog(
+                                            context, ref, g),
+                                        icon: const Icon(Icons.savings_outlined,
+                                            size: 16),
                                         label: const Text('Abonar'),
                                       ),
                                     ),
@@ -326,8 +388,10 @@ class GoalsScreen extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.expense),
-              title: const Text('Eliminar meta', style: TextStyle(color: AppColors.expense)),
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.expense),
+              title: const Text('Eliminar meta',
+                  style: TextStyle(color: AppColors.expense)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDeleteGoal(context, ref, g);
@@ -340,14 +404,18 @@ class GoalsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDeleteGoal(BuildContext context, WidgetRef ref, GoalModel g) async {
+  Future<void> _confirmDeleteGoal(
+      BuildContext context, WidgetRef ref, GoalModel g) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar meta'),
-        content: Text('¿Eliminar "${g.name}"? Los abonos registrados se perderán.'),
+        content:
+            Text('¿Eliminar "${g.name}"? Los abonos registrados se perderán.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.expense),
             onPressed: () => Navigator.pop(ctx, true),
@@ -363,12 +431,14 @@ class GoalsScreen extends ConsumerWidget {
       ref.invalidate(goalsProvider);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
-  void _showContributeDialog(BuildContext context, WidgetRef ref, GoalModel goal) {
+  void _showContributeDialog(
+      BuildContext context, WidgetRef ref, GoalModel goal) {
     final ctrl = TextEditingController();
     showDialog(
       context: context,
@@ -377,6 +447,7 @@ class GoalsScreen extends ConsumerWidget {
         content: TextField(
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [MoneyInputFormatter()],
           decoration: InputDecoration(
             labelText: 'Monto',
             prefixText: '${currencySymbol(ref.read(currencyProvider))} ',
@@ -384,10 +455,12 @@ class GoalsScreen extends ConsumerWidget {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
           FilledButton(
             onPressed: () async {
-              final amount = double.tryParse(ctrl.text.replaceAll(',', '.'));
+              final amount = parseMoneyInput(ctrl.text);
               if (amount == null || amount <= 0) return;
               try {
                 final dio = ref.read(dioProvider);
@@ -439,7 +512,6 @@ class _AnimatedCardEntry extends StatelessWidget {
 }
 
 // ─── Goal Sheet (Add + Edit) ─────────────────────────────────────────────────
-
 class _GoalSheet extends ConsumerStatefulWidget {
   const _GoalSheet({required this.onSaved, this.existing});
   final VoidCallback onSaved;
@@ -492,7 +564,7 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
     final e = widget.existing;
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _amountCtrl = TextEditingController(
-        text: e != null ? e.targetAmount.toStringAsFixed(2) : '');
+        text: e != null ? formatMoneyInputValue(e.targetAmount) : '');
     _selectedIcon = (e?.icon != null && e!.icon.isNotEmpty) ? e.icon : '🎯';
     if (e?.targetDate != null && e!.targetDate!.isNotEmpty) {
       _targetDate = DateTime.tryParse(e.targetDate!);
@@ -519,7 +591,8 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Selecciona un emoji', style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text('Selecciona un emoji',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               GridView.builder(
                 shrinkWrap: true,
@@ -578,19 +651,23 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
       final dio = ref.read(dioProvider);
       final body = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
-        'targetAmount': double.parse(_amountCtrl.text.replaceAll(',', '.')),
+        'targetAmount': parseMoneyInput(_amountCtrl.text),
       };
       body['icon'] = _selectedIcon;
-      if (_targetDate != null) body['targetDate'] = _targetDate!.toIso8601String().split('T')[0];
+      if (_targetDate != null)
+        body['targetDate'] = _targetDate!.toIso8601String().split('T')[0];
       if (_isEditing) {
-        await dio.patch('${ApiConstants.goals}/${widget.existing!.id}', data: body);
+        await dio.patch('${ApiConstants.goals}/${widget.existing!.id}',
+            data: body);
       } else {
         await dio.post(ApiConstants.goals, data: body);
       }
       widget.onSaved();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -615,19 +692,22 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
             TextFormField(
               controller: _nameCtrl,
               decoration: const InputDecoration(labelText: 'Nombre de la meta'),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [MoneyInputFormatter()],
               decoration: InputDecoration(
                 labelText: 'Monto objetivo',
                 prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Requerido';
-                if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Número inválido';
+                if (parseMoneyInput(v) == null) return 'Número inválido';
                 return null;
               },
             ),
@@ -643,9 +723,11 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
                     children: _emojiOptions.take(8).map((emoji) {
                       final selected = emoji == _selectedIcon;
                       return ChoiceChip(
-                        label: Text(emoji, style: const TextStyle(fontSize: 18)),
+                        label:
+                            Text(emoji, style: const TextStyle(fontSize: 18)),
                         selected: selected,
-                        onSelected: (_) => setState(() => _selectedIcon = emoji),
+                        onSelected: (_) =>
+                            setState(() => _selectedIcon = emoji),
                       );
                     }).toList(),
                   ),
@@ -670,7 +752,10 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
             FilledButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(_isEditing ? 'Guardar cambios' : 'Crear meta'),
             ),
           ],

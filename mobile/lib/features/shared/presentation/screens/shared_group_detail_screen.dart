@@ -18,6 +18,7 @@ import '../../models/shared_balance_model.dart';
 import '../../models/shared_settlement_model.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../screens/add_shared_expense_screen.dart';
+import '../../../../core/formatters/money_input_formatter.dart';
 
 class SharedGroupDetailScreen extends ConsumerStatefulWidget {
   const SharedGroupDetailScreen({super.key, required this.groupId});
@@ -1576,7 +1577,7 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
   void initState() {
     super.initState();
     _amountCtrl = TextEditingController(
-      text: widget.settlement.amount.toStringAsFixed(2),
+      text: formatMoneyInputValue(widget.settlement.amount),
     );
     _noteCtrl = TextEditingController(text: widget.settlement.note ?? '');
     _date = widget.settlement.date;
@@ -1611,7 +1612,7 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
       await ref.read(sharedSettlementsRepositoryProvider).updateSettlement(
             groupId: widget.groupId,
             settlementId: widget.settlement.id,
-            amount: double.parse(_amountCtrl.text.replaceAll(',', '.')),
+            amount: parseMoneyInput(_amountCtrl.text) ?? 0,
             date: _date.toIso8601String().split('T').first,
             paymentMethod: _paymentMethod,
             note: _noteCtrl.text.trim(),
@@ -1668,8 +1669,7 @@ class _EditSettlementSheetState extends ConsumerState<_EditSettlementSheet> {
                   prefixText: '${currencySymbol(widget.currency)} ',
                 ),
                 validator: (value) {
-                  final amount =
-                      double.tryParse(value?.replaceAll(',', '.') ?? '');
+                  final amount = parseMoneyInput(value ?? '');
                   if (amount == null || amount <= 0) return 'Monto inválido';
                   return null;
                 },
@@ -1763,8 +1763,8 @@ class _SettlementSheetState extends State<_SettlementSheet> {
   @override
   void initState() {
     super.initState();
-    _amtCtrl =
-        TextEditingController(text: widget.suggestedAmount.toStringAsFixed(2));
+    _amtCtrl = TextEditingController(
+        text: formatMoneyInputValue(widget.suggestedAmount));
   }
 
   @override
@@ -1847,9 +1847,10 @@ class _SettlementSheetState extends State<_SettlementSheet> {
               ),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [MoneyInputFormatter()],
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Ingresa un monto';
-                final parsed = double.tryParse(v);
+                final parsed = parseMoneyInput(v);
                 if (parsed == null || parsed <= 0) return 'Monto inválido';
                 return null;
               },

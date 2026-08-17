@@ -18,6 +18,7 @@ import { CashModule } from '../cash/cash.module';
 import { User } from '../users/user.entity';
 import { UserNotificationPreferences } from '../users/user-notification-preferences.entity';
 import { PushNotificationService } from '../../common/services/push-notification.service';
+import { Insight } from '../insights/insight.entity';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PushNotificationService } from '../../common/services/push-notification
       SharedExpenseApproval,
       User,
       UserNotificationPreferences,
+      Insight,
     ]),
     CashModule,
   ],
