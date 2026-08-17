@@ -3,7 +3,7 @@
 // This worker serves two purposes: FCM background notifications and a
 // network-first cache for the static Flutter shell. It never caches API data.
 const APP_ROOT = new URL('/', self.location.origin);
-const CACHE_NAME = 'zentri-shell-v1';
+const CACHE_NAME = 'zentri-shell-v2';
 const SHELL_ASSETS = [
   appUrl(''),
   appUrl('index.html'),

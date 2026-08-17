@@ -99,10 +99,15 @@
           .catch(function (error) {
             console.warn('No se pudo registrar el worker de Zentri:', error);
           });
-        navigator.serviceWorker.register(workerUrl, { scope: fcmScope })
-          .catch(function (error) {
-            console.warn('No se pudo registrar el worker de FCM:', error);
-          });
+        // Keep the FCM scope separate, but let one worker own the app root.
+        // Re-registering the same worker at multiple overlapping scopes can
+        // leave an installed PWA controlled by an older registration.
+        if (fcmScope !== appScope) {
+          navigator.serviceWorker.register(workerUrl, { scope: fcmScope })
+            .catch(function (error) {
+              console.warn('No se pudo registrar el worker de FCM:', error);
+            });
+        }
       });
     }());
   </script>
