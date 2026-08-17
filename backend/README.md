@@ -70,6 +70,14 @@ npm run migration:run
 npm run start:prod
 ```
 
+For the production Docker image, use the compiled migration command before
+starting the process:
+
+```bash
+npm run migration:run:prod
+npm run start:prod
+```
+
 ## Compile and run the project
 
 ```bash
