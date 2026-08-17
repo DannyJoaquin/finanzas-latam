@@ -153,12 +153,15 @@ if (isConfigured) {
 
   messaging.onBackgroundMessage((payload) => {
     const notification = payload.notification || {};
+    const data = payload.data || {};
     const title = notification.title || 'Nueva alerta';
     const options = {
       body: notification.body || 'Tienes una nueva notificacion',
       icon: appUrl('icons/Icon-192.png'),
       badge: appUrl('icons/Icon-192.png'),
-      data: payload.data || {},
+      data,
+      tag: `zentri-${data.expenseId || payload.messageId || data.groupId || title}`,
+      renotify: false,
     };
 
     self.registration.showNotification(title, options);
