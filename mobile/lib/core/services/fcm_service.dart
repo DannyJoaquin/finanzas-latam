@@ -77,6 +77,8 @@ class FcmService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    if (kIsWeb) return;
+
     final title = message.notification?.title ?? 'Nueva alerta';
     final body = message.notification?.body ?? 'Tienes una nueva notificacion';
 
