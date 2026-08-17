@@ -32,6 +32,7 @@ import { RecurringExpensesModule } from './modules/recurring-expenses/recurring-
 import { GlobalJwtAuthGuard } from './modules/auth/guards/global-jwt-auth.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HealthController } from './health.controller';
 
 // Jobs
 import { InsightsGeneratorJob } from './jobs/insights-generator.job';
@@ -147,7 +148,7 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
     SharedGroupsModule,
     RecurringExpensesModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [
     AppService,
     // Global JWT guard — all routes require auth unless @Public()
