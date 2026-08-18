@@ -64,6 +64,54 @@ class AppRoutes {
   static const shared = '/shared';
   static String sharedGroupDetail(String id) => '/shared/$id';
   static String sharedAddExpense(String id) => '/shared/$id/add-expense';
+
+  // Order of the main bottom-nav/rail tabs, used to pick a slide direction
+  // when navigating between them (advanced mode superset; budgets is simply
+  // absent from the tab list in simple mode).
+  static const tabOrder = [home, expenses, incomes, budgets, goals, shared];
+
+  static int tabIndexOf(String location) {
+    if (location == shared || location.startsWith('$shared/')) {
+      return tabOrder.indexOf(shared);
+    }
+    for (var i = 0; i < tabOrder.length; i++) {
+      if (location.startsWith(tabOrder[i])) return i;
+    }
+    return -1;
+  }
+}
+
+// Tracks the previously active tab so route transitions can pick a slide
+// direction consistent with the tab's position in the bottom nav/rail,
+// instead of GoRouter's platform default (which always slides one way).
+int _lastTabIndex = 0;
+
+Page<void> _tabPage(GoRouterState state, Widget child) {
+  final newIndex = AppRoutes.tabIndexOf(state.uri.path);
+  final fromIndex = _lastTabIndex;
+  if (newIndex >= 0) _lastTabIndex = newIndex;
+
+  final goingForward = newIndex >= 0 && newIndex > fromIndex;
+  final beginOffset =
+      newIndex < 0 ? const Offset(0, 0.02) : Offset(goingForward ? 0.06 : -0.06, 0);
+
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: beginOffset, end: Offset.zero)
+              .animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 // A ChangeNotifier that GoRouter uses as refreshListenable.
@@ -151,10 +199,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (c, s, child) => AppShell(location: s.uri.path, child: child),
         routes: [
-          GoRoute(path: AppRoutes.home, builder: (c, s) => const HomeScreen()),
+          GoRoute(
+            path: AppRoutes.home,
+            pageBuilder: (c, s) => _tabPage(s, const HomeScreen()),
+          ),
           GoRoute(
             path: AppRoutes.expenses,
-            builder: (c, s) => const ExpensesListScreen(),
+            pageBuilder: (c, s) => _tabPage(s, const ExpensesListScreen()),
             routes: [
               GoRoute(
                 path: 'add',
@@ -167,13 +218,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-              path: AppRoutes.incomes,
-              builder: (c, s) => const IncomesScreen()),
+            path: AppRoutes.incomes,
+            pageBuilder: (c, s) => _tabPage(s, const IncomesScreen()),
+          ),
           GoRoute(
-              path: AppRoutes.budgets,
-              builder: (c, s) => const BudgetsScreen()),
+            path: AppRoutes.budgets,
+            pageBuilder: (c, s) => _tabPage(s, const BudgetsScreen()),
+          ),
           GoRoute(
-              path: AppRoutes.goals, builder: (c, s) => const GoalsScreen()),
+            path: AppRoutes.goals,
+            pageBuilder: (c, s) => _tabPage(s, const GoalsScreen()),
+          ),
           GoRoute(
               path: AppRoutes.analytics,
               builder: (c, s) => const AnalyticsScreen()),
@@ -208,7 +263,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               builder: (c, s) => const LoanCalculatorScreen()),
           GoRoute(
             path: AppRoutes.shared,
-            builder: (c, s) => const SharedGroupsScreen(),
+            pageBuilder: (c, s) => _tabPage(s, const SharedGroupsScreen()),
             routes: [
               GoRoute(
                 path: ':id',
