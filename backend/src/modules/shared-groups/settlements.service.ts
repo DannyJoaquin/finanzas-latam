@@ -7,6 +7,7 @@ import { SharedGroupsService } from './shared-groups.service';
 import { CashService } from '../cash/cash.service';
 import { PushNotificationService } from '../../common/services/push-notification.service';
 import { User } from '../users/user.entity';
+import { formatMoney } from '../../common/utils/money-format.util';
 
 @Injectable()
 export class SettlementsService {
@@ -67,7 +68,7 @@ export class SettlementsService {
         userId: receiver.id,
         fcmToken: receiver.fcmToken,
         title: 'Recibiste un pago',
-        body: `L ${Number(dto.amount).toFixed(2)} — liquidación en grupo compartido`,
+        body: `L ${formatMoney(Number(dto.amount), 2)} — liquidación en grupo compartido`,
         data: { type: 'shared_settlement', groupId, settlementId: saved.id },
       }).catch(() => {/* Non-fatal */});
     }

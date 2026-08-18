@@ -14,6 +14,7 @@ import { SharedGroup } from './entities/shared-group.entity';
 import { User } from '../users/user.entity';
 import { UserNotificationPreferences } from '../users/user-notification-preferences.entity';
 import { Insight, InsightPriority, InsightType } from '../insights/insight.entity';
+import { formatMoney } from '../../common/utils/money-format.util';
 
 @Injectable()
 export class SharedExpensesService {
@@ -168,7 +169,7 @@ export class SharedExpensesService {
           userId: user.id,
           fcmToken: user.fcmToken,
           title: `Nuevo gasto en ${groupName}`,
-          body: `${payerName} agregó "${dto.description}" — tu parte: L ${myShare.toFixed(2)}`,
+          body: `${payerName} agregó "${dto.description}" — tu parte: L ${formatMoney(myShare, 2)}`,
           data: { type: 'shared_expense', groupId, expenseId: saved.id },
           skipDailyCap: true,
         }).catch(() => {/* Non-fatal */});
@@ -176,7 +177,7 @@ export class SharedExpensesService {
 
       // Persist an in-app notification as well, so the event is visible even
       // when the browser has no FCM permission or the user is offline.
-      const notificationBody = `${payerName} agregó "${dto.description}" en ${groupName} por L ${Number(dto.totalAmount).toFixed(2)}.`;
+      const notificationBody = `${payerName} agregó "${dto.description}" en ${groupName} por L ${formatMoney(Number(dto.totalAmount), 2)}.`;
       await this.insightRepo.save(
         participantUserIds.map((userId) =>
           this.insightRepo.create({

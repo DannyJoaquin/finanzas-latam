@@ -9,6 +9,7 @@ import { Budget } from '../budgets/budget.entity';
 import { INSIGHT_COOLDOWN_HOURS } from '../../common/services/notification-routing.service';
 import { PushNotificationService } from '../../common/services/push-notification.service';
 import { NotificationPreferencesService } from '../users/notification-preferences.service';
+import { formatMoney } from '../../common/utils/money-format.util';
 
 @Injectable()
 export class InsightsGeneratorService {
@@ -125,7 +126,7 @@ export class InsightsGeneratorService {
         priority: anomaly.severity === 'high' ? InsightPriority.HIGH : InsightPriority.MEDIUM,
         title: `Gasto inusual en ${anomaly.categoryName}`,
         body: `Esta semana gastaste ${multiplier}x más de lo normal en ${anomaly.categoryName}. ` +
-          `Promedio semanal: L ${anomaly.avgWeeklyTotal.toFixed(0)}, esta semana: L ${anomaly.currentWeekTotal.toFixed(0)}.`,
+          `Promedio semanal: L ${formatMoney(anomaly.avgWeeklyTotal)}, esta semana: L ${formatMoney(anomaly.currentWeekTotal)}.`,
         metadata: {
           categoryId: anomaly.categoryId,
           categoryName: anomaly.categoryName,
@@ -164,7 +165,7 @@ export class InsightsGeneratorService {
       priority: InsightPriority.CRITICAL,
       title: 'Tu dinero podría no alcanzar hasta la quincena',
       body: `A tu ritmo actual de gastos, podrías quedarte sin fondos antes del final del período. ` +
-        `Gasto diario seguro: L ${dashboard.safeDailySpend.toFixed(0)}. ` +
+        `Gasto diario seguro: L ${formatMoney(dashboard.safeDailySpend)}. ` +
         (dashboard.cashRunoutDate
           ? `Estimado de quiebre: ${dashboard.cashRunoutDate}.`
           : ''),
@@ -240,7 +241,7 @@ export class InsightsGeneratorService {
         priority,
         title: `Tu presupuesto "${budget.name}" va rápido`,
         body:
-          `Llevas L ${spent.toFixed(0)} de L ${budgetAmount.toFixed(0)} ` +
+          `Llevas L ${formatMoney(spent)} de L ${formatMoney(budgetAmount)} ` +
           `(${Math.round(pctSpent * 100)}%) y al ritmo actual ` +
           `podrías llegar al ${projectedPct}% al finalizar el período.`,
         metadata: {
@@ -333,8 +334,8 @@ export class InsightsGeneratorService {
       priority: InsightPriority.MEDIUM,
       title: `${top.categoryName} consume el ${pctDisplay}% de tus ingresos`,
       body: `Reducir un 20% en ${top.categoryName} te ahorraría ` +
-        `L ${simulation.projectedSavings.toFixed(0)}/mes — ` +
-        `L ${simulation.annualSavings.toFixed(0)} al año.`,
+        `L ${formatMoney(simulation.projectedSavings)}/mes — ` +
+        `L ${formatMoney(simulation.annualSavings)} al año.`,
       metadata: {
         categoryId: top.categoryId,
         categoryName: top.categoryName,

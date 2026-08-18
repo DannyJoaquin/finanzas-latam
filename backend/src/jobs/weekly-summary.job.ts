@@ -6,6 +6,7 @@ import { User } from '../modules/users/user.entity';
 import { Expense } from '../modules/expenses/expense.entity';
 import { PushNotificationService } from '../common/services/push-notification.service';
 import { NotificationPreferencesService } from '../modules/users/notification-preferences.service';
+import { formatMoney } from '../common/utils/money-format.util';
 
 /**
  * Sends an enriched weekly spending summary every Monday at 9:00 AM.
@@ -82,7 +83,7 @@ export class WeeklySummaryJob {
     topCategory: { name: string; total: number } | null,
     currency: string,
   ): string {
-    const fmt = (n: number) => n.toFixed(0);
+    const fmt = (n: number) => formatMoney(n);
 
     // Determine status vs previous week
     let statusPart = '';

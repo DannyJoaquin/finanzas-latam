@@ -10,6 +10,7 @@ import { User } from '../modules/users/user.entity';
 import { PushNotificationService } from '../common/services/push-notification.service';
 import { SharedGroup } from '../modules/shared-groups/entities/shared-group.entity';
 import { SharedSettlement } from '../modules/shared-groups/entities/shared-settlement.entity';
+import { formatMoney } from '../common/utils/money-format.util';
 
 @Injectable()
 export class DebtReminderJob {
@@ -116,7 +117,7 @@ export class DebtReminderJob {
           userId: user.id,
           fcmToken: user.fcmToken,
           title: 'Recordatorio de deuda',
-          body: `Tienes L ${totalOwed.toFixed(2)} pendientes en ${groupDebts.length === 1 ? topGroup.groupName : `${groupDebts.length} grupos`}`,
+          body: `Tienes L ${formatMoney(totalOwed, 2)} pendientes en ${groupDebts.length === 1 ? topGroup.groupName : `${groupDebts.length} grupos`}`,
           data: { type: 'debt_reminder' },
           skipDailyCap: false,
         }).catch(() => {/* Non-fatal */});
