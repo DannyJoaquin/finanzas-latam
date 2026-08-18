@@ -30,4 +30,38 @@ void main() {
     expect(result.text, '125,000.50');
     expect(parseMoneyInput(result.text), 125000.50);
   });
+
+  test('places cursor after the decimal point when typed', () {
+    final formatter = MoneyInputFormatter();
+    final result = formatter.formatEditUpdate(
+      const TextEditingValue(
+        text: '1000',
+        selection: TextSelection.collapsed(offset: 4),
+      ),
+      const TextEditingValue(
+        text: '1000.',
+        selection: TextSelection.collapsed(offset: 5),
+      ),
+    );
+
+    expect(result.text, '1,000.');
+    expect(result.selection.baseOffset, result.text.length);
+  });
+
+  test('keeps cursor after decimal point while typing decimals', () {
+    final formatter = MoneyInputFormatter();
+    final result = formatter.formatEditUpdate(
+      const TextEditingValue(
+        text: '1,000.5',
+        selection: TextSelection.collapsed(offset: 7),
+      ),
+      const TextEditingValue(
+        text: '1,000.50',
+        selection: TextSelection.collapsed(offset: 8),
+      ),
+    );
+
+    expect(result.text, '1,000.50');
+    expect(result.selection.baseOffset, result.text.length);
+  });
 }

@@ -29,11 +29,20 @@ class MoneyInputFormatter extends TextInputFormatter {
 
     final grouped = _groupThousands(integerPart);
     final formatted = grouped + (hasDecimalSeparator ? '.$decimalPart' : '');
-    final rawDigitsBeforeCursor = raw
-        .substring(0, newValue.selection.end.clamp(0, raw.length))
+
+    final rawBeforeCursor = raw.substring(
+      0,
+      newValue.selection.end.clamp(0, raw.length),
+    );
+    final digitsBeforeCursor = rawBeforeCursor
         .replaceAll(RegExp(r'\D'), '')
         .length;
-    final cursor = _cursorForDigits(formatted, rawDigitsBeforeCursor);
+    final cursorAfterDecimalPoint = rawBeforeCursor.contains('.');
+    final cursor = _cursorForDigits(
+      formatted,
+      digitsBeforeCursor,
+      includeDecimalPoint: cursorAfterDecimalPoint,
+    );
 
     return TextEditingValue(
       text: formatted,
@@ -50,13 +59,27 @@ class MoneyInputFormatter extends TextInputFormatter {
     return chunks.join(',');
   }
 
-  int _cursorForDigits(String value, int digitCount) {
-    if (digitCount == 0) return 0;
+  int _cursorForDigits(
+    String value,
+    int digitCount, {
+    required bool includeDecimalPoint,
+  }) {
+    if (digitCount == 0) {
+      return includeDecimalPoint && value.startsWith('0.') ? 2 : 0;
+    }
     var seen = 0;
     for (var i = 0; i < value.length; i++) {
       if (RegExp(r'\d').hasMatch(value[i])) {
         seen++;
-        if (seen == digitCount) return i + 1;
+        if (seen == digitCount) {
+          final afterDigit = i + 1;
+          if (includeDecimalPoint &&
+              afterDigit < value.length &&
+              value[afterDigit] == '.') {
+            return afterDigit + 1;
+          }
+          return afterDigit;
+        }
       }
     }
     return value.length;

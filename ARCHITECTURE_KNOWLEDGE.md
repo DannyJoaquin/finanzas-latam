@@ -433,6 +433,129 @@ jobs/*.job.ts ← importan entidades directamente vía app.module.ts (TypeOrmMod
 
 ---
 
+## Despliegue y Operacion
+
+### Servicios desplegados
+
+| Componente | Servicio | Ubicacion |
+|---|---|---|
+| Codigo fuente | GitHub | Repositorio `DannyJoaquin/finanzas-latam`, rama `master` |
+| Frontend Flutter Web/PWA | Cloudflare Pages | `https://app.zentri.tech` |
+| Backend NestJS | Render | `https://api.zentri.tech/api/v1` |
+| PostgreSQL | Neon | Base de datos permanente |
+| Redis | Upstash | Contadores, limites y datos temporales |
+| Push notifications | Firebase Cloud Messaging | Service Worker web + Firebase Admin en Render |
+
+### Flujo completo
+
+```mermaid
+flowchart TD
+    Local[Codigo local] --> Commit[Commit y push a master]
+    Commit --> GitHub[GitHub]
+    GitHub --> Actions[GitHub Actions]
+    Actions --> Tests[Tests Flutter]
+    Tests --> Build[Build Flutter Web]
+    Build --> Inject[Inyeccion de variables Firebase Web]
+    Inject --> Pages[Cloudflare Pages]
+    Pages --> PWA[app.zentri.tech]
+    GitHub --> Render[Render]
+    Render --> Docker[Build de backend Docker]
+    Docker --> Migrations[Migraciones TypeORM]
+    Migrations --> Seed[Seed idempotente de categorias]
+    Seed --> API[Backend NestJS]
+    API --> Neon[Neon PostgreSQL]
+    API --> Upstash[Upstash Redis]
+    API --> FCM[Firebase Admin / FCM]
+```
+
+### Flujo de una actualizacion
+
+1. Se modifica el codigo en `mobile/` o `backend/`.
+2. Se ejecutan las validaciones locales correspondientes.
+3. Se hace commit y push a `master`:
+
+```powershell
+git add .
+git commit -m "descripcion del cambio"
+git push origin master
+```
+
+4. GitHub conserva el codigo y dispara los servicios conectados.
+5. GitHub Actions publica el frontend en Cloudflare Pages.
+6. Render construye y reinicia el backend cuando detecta el push.
+7. Neon y Upstash se mantienen como servicios externos; no se recrean durante un deploy.
+
+### Deploy del frontend
+
+El workflow `.github/workflows/pwa.yml` se ejecuta con cambios en `master` y:
+
+- instala Flutter;
+- ejecuta los tests del proyecto mobile;
+- construye Flutter Web con CanvasKit;
+- inyecta la configuracion Firebase Web en el build y en `firebase-messaging-sw.js`;
+- publica el resultado mediante `cloudflare/pages-action`.
+
+El frontend publicado es estatico. La PWA normalmente actualiza su Service Worker al cerrar y volver a abrirla. No es necesario borrarla y reinstalarla despues de cada deploy. Si sigue mostrando una version anterior, cerrar completamente la PWA y abrirla de nuevo; reinstalar es el ultimo recurso para limpiar una cache persistente.
+
+### Deploy del backend
+
+Render usa `backend/Dockerfile` y ejecuta el proceso de produccion:
+
+```text
+npm run migration:run:prod
+npm run seed:categories:prod
+npm run start:prod
+```
+
+La API publica es `https://api.zentri.tech/api/v1`. El endpoint de salud es:
+
+```text
+GET https://api.zentri.tech/api/v1/health
+```
+
+Un deploy de backend reinicia NestJS, pero no elimina la informacion de Neon ni los datos de Upstash.
+
+### Migraciones y seed
+
+Cuando cambia una entidad TypeORM:
+
+1. Se crea una migracion en `backend/src/database/migrations/`.
+2. La migracion se incluye en el mismo commit que el cambio de codigo.
+3. Render la ejecuta antes de iniciar NestJS.
+4. `seed:categories:prod` crea las categorias predeterminadas que no existan y puede ejecutarse varias veces.
+
+Las migraciones modifican la estructura sin borrar los datos existentes. No se debe eliminar Neon para aplicar un cambio normal. Antes de usar enums nuevos, revisar la advertencia de migraciones irreversibles en [Areas de Alto Riesgo](#áreas-de-alto-riesgo).
+
+### Variables y secretos
+
+Los secretos no se guardan en GitHub ni en el repositorio. Se configuran en el servicio que los necesita:
+
+| Servicio | Variables principales |
+|---|---|
+| Render | `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `FIREBASE_SERVICE_ACCOUNT` |
+| GitHub Actions | `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, `FIREBASE_WEB_MESSAGING_SENDER_ID`, `FIREBASE_WEB_PROJECT_ID`, `FIREBASE_WEB_AUTH_DOMAIN`, `FIREBASE_WEB_STORAGE_BUCKET`, `FIREBASE_WEB_VAPID_KEY` |
+| Cloudflare Pages | Publicacion automatica desde GitHub Actions; no debe recibir secretos del backend |
+
+`FIREBASE_SERVICE_ACCOUNT` contiene las credenciales privadas de Firebase Admin y solo debe existir en Render. Si se expone una clave privada, hay que revocarla en Firebase, generar otra y reemplazar la variable en Render.
+
+### Neon y Upstash
+
+**Neon** es PostgreSQL. Guarda datos relacionales y permanentes: usuarios, gastos, ingresos, presupuestos, metas, tarjetas, categorias, grupos compartidos, preferencias y notificaciones internas.
+
+**Upstash** es Redis. Se usa para datos rapidos o temporales: blacklist de refresh tokens, limites diarios de push, contadores, cache y coordinacion de procesos.
+
+La regla practica es: si el dato debe conservarse como parte del historial de negocio, va a Neon; si es temporal, expirable o necesita operaciones muy rapidas, puede ir a Upstash.
+
+### Verificacion posterior al deploy
+
+1. Revisar que GitHub Actions termine en estado `success`.
+2. Abrir `https://app.zentri.tech` y comprobar la version nueva.
+3. Consultar `https://api.zentri.tech/api/v1/health`.
+4. Revisar los logs de Render si el cambio afecta backend, migraciones o push.
+5. Para cambios de notificaciones, confirmar que el Service Worker y el token FCM correspondan a la version actual.
+
+---
+
 ## Resumen ejecutivo para decisiones rápidas
 
 - **¿Vas a tocar `User` o `Expense`?** Espera impacto en todo el backend. Grep el nombre de la entidad antes de asumir que solo afecta su propio módulo.
