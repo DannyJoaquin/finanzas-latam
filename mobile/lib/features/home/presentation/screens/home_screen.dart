@@ -879,7 +879,9 @@ class _BalanceCard extends ConsumerWidget {
                   children: [
                     _StatChip(
                       label: 'Ingresos',
-                      value: fmt.format(dash.totalIncome),
+                      value: dash.totalIncomeUSD > 0
+                          ? '${fmt.format(dash.totalIncome)}  +  ${currencyFmt('USD').format(dash.totalIncomeUSD)}'
+                          : fmt.format(dash.totalIncome),
                       color: AppColors.income,
                       isSimple: isSimple,
                       onTap: () => context.go(AppRoutes.incomes),
@@ -887,7 +889,9 @@ class _BalanceCard extends ConsumerWidget {
                     const SizedBox(width: 12),
                     _StatChip(
                       label: 'Gastos',
-                      value: fmt.format(dash.totalExpenses),
+                      value: dash.totalExpensesUSD > 0
+                          ? '${fmt.format(dash.totalExpenses)}  +  ${currencyFmt('USD').format(dash.totalExpensesUSD)}'
+                          : fmt.format(dash.totalExpenses),
                       color: AppColors.expense,
                       isSimple: isSimple,
                       onTap: () => context.go(AppRoutes.expenses),
@@ -1197,7 +1201,10 @@ class _CreditCardDebtCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fmt = ref.watch(currencyFmtProvider);
+    // amount is always HNL-denominated (creditCardTotal from the backend) —
+    // use the fixed HNL formatter, not the user's profile-currency
+    // preference, so this never mislabels the figure with the wrong symbol.
+    final fmt = currencyFmt('HNL');
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final accentColor =
@@ -1326,7 +1333,10 @@ class _CreditDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fmt = ref.watch(currencyFmtProvider);
+    // total is always HNL-denominated (creditCardTotal from the backend) —
+    // use the fixed HNL formatter, not the user's profile-currency
+    // preference, so this never mislabels the figure with the wrong symbol.
+    final fmt = currencyFmt('HNL');
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final accentColor =

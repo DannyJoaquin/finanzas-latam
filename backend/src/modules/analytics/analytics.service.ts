@@ -11,11 +11,16 @@ export interface DashboardData {
   currentPeriod: { start: string; end: string };
   daysRemaining: number;
   safeDailySpend: number;
+  safeDailySpendUSD: number;
   riskLevel: 'green' | 'yellow' | 'red';
   totalIncomeThisPeriod: number;
+  totalIncomeThisPeriodUSD: number;
   totalSpentThisPeriod: number;
+  totalSpentThisPeriodUSD: number;
   availableBalance: number;
+  availableBalanceUSD: number;
   todaySpent: number;
+  todaySpentUSD: number;
   cashRunoutDate: string | null;
   creditCardTotal: number;
   creditCardTotalUSD: number;
@@ -67,16 +72,20 @@ export class AnalyticsService {
     const [spentResult, todayResult, creditResult] = await Promise.all([
       this.expenseRepo
         .createQueryBuilder('e')
-        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .select('e.currency', 'currency')
+        .addSelect('COALESCE(SUM(e.amount), 0)', 'total')
         .where('e.userId = :userId AND e.date BETWEEN :start AND :end', {
           userId, start: startStr, end: endStr,
         })
-        .getRawOne<{ total: string }>(),
+        .groupBy('e.currency')
+        .getRawMany<{ currency: string; total: string }>(),
       this.expenseRepo
         .createQueryBuilder('e')
-        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .select('e.currency', 'currency')
+        .addSelect('COALESCE(SUM(e.amount), 0)', 'total')
         .where('e.userId = :userId AND e.date = :today', { userId, today: todayStr })
-        .getRawOne<{ total: string }>(),
+        .groupBy('e.currency')
+        .getRawMany<{ currency: string; total: string }>(),
       this.expenseRepo
         .createQueryBuilder('e')
         .select('e.currency', 'currency')
@@ -115,51 +124,65 @@ export class AnalyticsService {
       [IncomeCycle.MONTHLY]: 30,
     };
 
-    let totalIncome = 0;
+    // Income and spend are tracked per-currency throughout — HNL and USD are
+    // never summed together (no exchange rate exists in this system).
+    const totalIncomeByCurrency: Record<string, number> = { HNL: 0, USD: 0 };
     for (const src of incomeSources) {
+      const currency = src.currency === 'USD' ? 'USD' : 'HNL';
+      let amount = 0;
+
       const recorded = recordsByIncome.get(src.id);
       if (recorded != null) {
-        totalIncome += recorded;
-        continue;
-      }
-
-      if (src.nextExpectedAt) {
+        amount = recorded;
+      } else if (src.nextExpectedAt) {
         const expectedCount = this.countExpectedOccurrencesInRange(
           src,
           period.periodStart,
           incomeEnd,
         );
-        totalIncome += Number(src.amount) * expectedCount;
-        continue;
-      }
-
-      // Backward compatibility: recurring sources without configured date.
-      if (src.cycle !== IncomeCycle.ONE_TIME) {
+        amount = Number(src.amount) * expectedCount;
+      } else if (src.cycle !== IncomeCycle.ONE_TIME) {
+        // Backward compatibility: recurring sources without configured date.
         const cycleDays = cycleDaysMap[src.cycle] ?? 30;
         const occurrences = Math.max(1, Math.floor(periodDays / cycleDays));
-        totalIncome += Number(src.amount) * occurrences;
+        amount = Number(src.amount) * occurrences;
       }
+
+      totalIncomeByCurrency[currency] += amount;
     }
 
-    const totalSpent = parseFloat(spentResult?.total ?? '0');
-    const todaySpent = parseFloat(todayResult?.total ?? '0');
-    const creditCardRows = creditResult as { currency: string; total: string }[];
-    const creditCardTotal = parseFloat(
-      creditCardRows.find(r => r.currency === 'HNL')?.total ?? '0'
-    );
-    const creditCardTotalUSD = parseFloat(
-      creditCardRows.find(r => r.currency === 'USD')?.total ?? '0'
-    );
-    const available = totalIncome - totalSpent;
-    const safeDailySpend = daysRemaining > 0 ? available / daysRemaining : 0;
+    const byCurrency = (rows: { currency: string; total: string }[]) => ({
+      HNL: parseFloat(rows.find((r) => r.currency === 'HNL')?.total ?? '0'),
+      USD: parseFloat(rows.find((r) => r.currency === 'USD')?.total ?? '0'),
+    });
 
-    // Risk level: green < 70% spent, yellow 70–90%, red > 90%
+    const totalSpentByCurrency = byCurrency(spentResult);
+    const todaySpentByCurrency = byCurrency(todayResult);
+    const creditCardByCurrency = byCurrency(creditResult);
+
+    const totalIncome = totalIncomeByCurrency.HNL;
+    const totalIncomeUSD = totalIncomeByCurrency.USD;
+    const totalSpent = totalSpentByCurrency.HNL;
+    const totalSpentUSD = totalSpentByCurrency.USD;
+    const todaySpent = todaySpentByCurrency.HNL;
+    const todaySpentUSD = todaySpentByCurrency.USD;
+    const creditCardTotal = creditCardByCurrency.HNL;
+    const creditCardTotalUSD = creditCardByCurrency.USD;
+
+    const available = totalIncome - totalSpent;
+    const availableUSD = totalIncomeUSD - totalSpentUSD;
+    const safeDailySpend = daysRemaining > 0 ? available / daysRemaining : 0;
+    const safeDailySpendUSD = daysRemaining > 0 ? availableUSD / daysRemaining : 0;
+
+    // Risk level: green < 70% spent, yellow 70–90%, red > 90% — evaluated on
+    // the HNL side (the primary/default currency for this market); USD-only
+    // users would need a separate risk signal, out of scope for this fix.
     // If no income AND no expenses, user is new — treat as green (not red)
     const spentRatio = totalIncome > 0 ? totalSpent / totalIncome : (totalSpent > 0 ? 1 : 0);
     const riskLevel: 'green' | 'yellow' | 'red' =
       spentRatio < 0.7 ? 'green' : spentRatio < 0.9 ? 'yellow' : 'red';
 
-    // Cash-runout projection: at avg daily spend, when does available hit 0?
+    // Cash-runout projection: at avg daily spend, when does available (HNL) hit 0?
     const periodDaysElapsed = this.daysBetween(period.periodStart, today);
     const avgDailySpend = periodDaysElapsed > 0 ? totalSpent / periodDaysElapsed : totalSpent;
     let cashRunoutDate: string | null = null;
@@ -174,11 +197,16 @@ export class AnalyticsService {
       currentPeriod: { start: startStr, end: endStr },
       daysRemaining,
       safeDailySpend: Math.max(0, safeDailySpend),
+      safeDailySpendUSD: Math.max(0, safeDailySpendUSD),
       riskLevel,
       totalIncomeThisPeriod: totalIncome,
+      totalIncomeThisPeriodUSD: totalIncomeUSD,
       totalSpentThisPeriod: totalSpent,
+      totalSpentThisPeriodUSD: totalSpentUSD,
       availableBalance: available,
+      availableBalanceUSD: availableUSD,
       todaySpent,
+      todaySpentUSD,
       cashRunoutDate,
       creditCardTotal,
       creditCardTotalUSD,

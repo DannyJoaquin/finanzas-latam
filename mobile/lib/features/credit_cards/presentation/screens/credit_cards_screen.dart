@@ -910,6 +910,13 @@ class _InfoTile extends StatelessWidget {
 
 // ── Utilization card ──────────────────────────────────────────────────────────
 
+/// Test-only accessor for the private [_UtilizationCard] widget — Dart
+/// privacy is file-scoped, so widget tests need this seam to exercise it
+/// directly without duplicating the currency-split logic in the test.
+@visibleForTesting
+Widget buildUtilizationCardForTest(CreditCardSummary card) =>
+    _UtilizationCard(card: card);
+
 class _UtilizationCard extends StatelessWidget {
   const _UtilizationCard({required this.card});
   final CreditCardSummary card;
@@ -919,11 +926,22 @@ class _UtilizationCard extends StatelessWidget {
     final fmt = _cardFmt(card.limitCurrency);
     final fmtLimit = fmt;
     final pct = card.utilizationPct ?? 0;
-    // Utilization is based on HNL only (USD can't be added without exchange rate)
+    // Utilization only sums the balance in the limit's own currency — there's
+    // no exchange rate in the system, so mixing HNL and USD spend against a
+    // single-currency limit would misrepresent the percentage. This mirrors
+    // CreditCardsService.buildCardSummary's totalUsedInLimitCurrency exactly.
     final unpaidOverdueHNL =
         (card.overdueBalanceHNL - (card.closedCyclePaidAmount ?? 0))
             .clamp(0.0, double.infinity);
+    final unpaidOverdueUSD =
+        (card.overdueBalanceUSD - (card.closedCyclePaidAmount ?? 0))
+            .clamp(0.0, double.infinity);
     final totalUsedHNL = card.currentBalanceHNL + unpaidOverdueHNL;
+    final totalUsedUSD = card.currentBalanceUSD + unpaidOverdueUSD;
+    final isUsdLimit = card.limitCurrency == 'USD';
+    final totalUsedInLimitCurrency = isUsdLimit ? totalUsedUSD : totalUsedHNL;
+    final secondaryUsed = isUsdLimit ? totalUsedHNL : totalUsedUSD;
+    final secondaryCurrency = isUsdLimit ? 'HNL' : 'USD';
     final color = pct > 80
         ? const Color(0xFFEA4335)
         : pct > 50
@@ -988,9 +1006,9 @@ class _UtilizationCard extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final usedText = Text(
-                  card.currentBalanceUSD > 0
-                      ? 'Usado: ${fmt.format(totalUsedHNL)}  +  ${_cardFmt('USD').format(card.currentBalanceUSD)}'
-                      : 'Usado: ${fmt.format(totalUsedHNL)}',
+                  secondaryUsed > 0
+                      ? 'Usado: ${fmt.format(totalUsedInLimitCurrency)}  +  ${_cardFmt(secondaryCurrency).format(secondaryUsed)}'
+                      : 'Usado: ${fmt.format(totalUsedInLimitCurrency)}',
                   style: const TextStyle(fontSize: 12),
                 );
                 final limitText = Text(
