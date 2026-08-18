@@ -1,9 +1,16 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { CashService, CreateCashAccountDto, CashOperationDto } from './cash.service';
-import { CashAccount } from './cash-account.entity';
-import { CashTransaction, CashTxType } from './cash-transaction.entity';
+import {
+  AccountsService,
+  CreateAccountDto,
+  CashOperationDto,
+} from './accounts.service';
+import { Account } from './account.entity';
+import {
+  AccountTransaction,
+  AccountTxType,
+} from './account-transaction.entity';
 
 const mockAccountRepo = () => ({
   find: jest.fn(),
@@ -21,15 +28,15 @@ const mockTxRepo = () => ({
   save: jest.fn(),
 });
 
-describe('CashService', () => {
-  let service: CashService;
+describe('AccountsService', () => {
+  let service: AccountsService;
   let accountRepo: ReturnType<typeof mockAccountRepo>;
   let txRepo: ReturnType<typeof mockTxRepo>;
 
   const userId = 'user-1';
   const accountId = 'account-1';
 
-  const mockAccount = (): CashAccount =>
+  const mockAccount = (): Account =>
     ({
       id: accountId,
       userId,
@@ -37,21 +44,25 @@ describe('CashService', () => {
       currency: 'HNL',
       balance: 100,
       isDefault: true,
+      isLocked: false,
       sortOrder: 0,
-    } as CashAccount);
+    }) as Account;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        CashService,
-        { provide: getRepositoryToken(CashAccount), useFactory: mockAccountRepo },
-        { provide: getRepositoryToken(CashTransaction), useFactory: mockTxRepo },
+        AccountsService,
+        { provide: getRepositoryToken(Account), useFactory: mockAccountRepo },
+        {
+          provide: getRepositoryToken(AccountTransaction),
+          useFactory: mockTxRepo,
+        },
       ],
     }).compile();
 
-    service = module.get<CashService>(CashService);
-    accountRepo = module.get(getRepositoryToken(CashAccount));
-    txRepo = module.get(getRepositoryToken(CashTransaction));
+    service = module.get<AccountsService>(AccountsService);
+    accountRepo = module.get(getRepositoryToken(Account));
+    txRepo = module.get(getRepositoryToken(AccountTransaction));
   });
 
   // ──────────────────────────────────────────────────────────────
@@ -86,7 +97,9 @@ describe('CashService', () => {
 
     it('throws NotFoundException when account not found', async () => {
       accountRepo.findOne.mockResolvedValue(null);
-      await expect(service.findAccount(userId, 'bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.findAccount(userId, 'bad-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -96,7 +109,7 @@ describe('CashService', () => {
   describe('createAccount', () => {
     it('sets isDefault=true for first account', async () => {
       accountRepo.count.mockResolvedValue(0);
-      const dto: CreateCashAccountDto = { name: 'Mi cartera' };
+      const dto: CreateAccountDto = { name: 'Mi cartera' };
       const created = { ...mockAccount(), id: 'new-id' };
       accountRepo.create.mockReturnValue(created);
       accountRepo.save.mockResolvedValue(created);
@@ -113,7 +126,7 @@ describe('CashService', () => {
 
     it('sets isDefault=false when accounts already exist', async () => {
       accountRepo.count.mockResolvedValue(2);
-      const dto: CreateCashAccountDto = { name: 'Segunda cartera' };
+      const dto: CreateAccountDto = { name: 'Segunda cartera' };
       const created = { ...mockAccount(), isDefault: false };
       accountRepo.create.mockReturnValue(created);
       accountRepo.save.mockResolvedValue(created);
@@ -127,18 +140,18 @@ describe('CashService', () => {
 
     it('creates initial deposit transaction when initialBalance > 0', async () => {
       accountRepo.count.mockResolvedValue(0);
-      const dto: CreateCashAccountDto = { name: 'Cartera', initialBalance: 500 };
+      const dto: CreateAccountDto = { name: 'Cartera', initialBalance: 500 };
       const saved = { ...mockAccount(), id: 'new-id', balance: 500 };
       accountRepo.create.mockReturnValue(saved);
       accountRepo.save.mockResolvedValue(saved);
-      txRepo.create.mockReturnValue({ type: CashTxType.DEPOSIT });
+      txRepo.create.mockReturnValue({ type: AccountTxType.DEPOSIT });
       txRepo.save.mockResolvedValue({});
 
       await service.createAccount(userId, dto);
 
       expect(txRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: CashTxType.DEPOSIT,
+          type: AccountTxType.DEPOSIT,
           amount: 500,
           description: 'Saldo inicial',
         }),
@@ -148,7 +161,7 @@ describe('CashService', () => {
 
     it('does NOT create transaction when initialBalance is 0', async () => {
       accountRepo.count.mockResolvedValue(0);
-      const dto: CreateCashAccountDto = { name: 'Cartera', initialBalance: 0 };
+      const dto: CreateAccountDto = { name: 'Cartera', initialBalance: 0 };
       const saved = { ...mockAccount(), balance: 0 };
       accountRepo.create.mockReturnValue(saved);
       accountRepo.save.mockResolvedValue(saved);
@@ -168,15 +181,15 @@ describe('CashService', () => {
       acc.balance = 100;
       accountRepo.findOne.mockResolvedValue(acc);
       accountRepo.save.mockResolvedValue({ ...acc, balance: 150 });
-      txRepo.create.mockReturnValue({ type: CashTxType.DEPOSIT });
+      txRepo.create.mockReturnValue({ type: AccountTxType.DEPOSIT });
       txRepo.save.mockResolvedValue({});
 
       const dto: CashOperationDto = { amount: 50 };
-      const result = await service.deposit(userId, accountId, dto);
+      await service.deposit(userId, accountId, dto);
 
       expect(acc.balance).toBe(150);
       expect(txRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ type: CashTxType.DEPOSIT, amount: 50 }),
+        expect.objectContaining({ type: AccountTxType.DEPOSIT, amount: 50 }),
       );
     });
 
@@ -197,14 +210,14 @@ describe('CashService', () => {
       acc.balance = 200;
       accountRepo.findOne.mockResolvedValue(acc);
       accountRepo.save.mockResolvedValue({ ...acc, balance: 150 });
-      txRepo.create.mockReturnValue({ type: CashTxType.WITHDRAW });
+      txRepo.create.mockReturnValue({ type: AccountTxType.WITHDRAW });
       txRepo.save.mockResolvedValue({});
 
       await service.withdraw(userId, accountId, { amount: 50 });
 
       expect(acc.balance).toBe(150);
       expect(txRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ type: CashTxType.WITHDRAW, amount: 50 }),
+        expect.objectContaining({ type: AccountTxType.WITHDRAW, amount: 50 }),
       );
     });
 
@@ -218,7 +231,7 @@ describe('CashService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('throws BadRequestException when amount equals balance exactly (edge: passes)', async () => {
+    it('allows withdrawal when amount equals balance exactly', async () => {
       const acc = mockAccount();
       acc.balance = 100;
       accountRepo.findOne.mockResolvedValue(acc);
@@ -229,6 +242,17 @@ describe('CashService', () => {
       await expect(
         service.withdraw(userId, accountId, { amount: 100 }),
       ).resolves.not.toThrow();
+    });
+
+    it('throws BadRequestException when the account is locked', async () => {
+      const acc = mockAccount();
+      acc.balance = 200;
+      acc.isLocked = true;
+      accountRepo.findOne.mockResolvedValue(acc);
+
+      await expect(
+        service.withdraw(userId, accountId, { amount: 50 }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -244,7 +268,7 @@ describe('CashService', () => {
 
       expect(txRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { cashAccountId: accountId, userId },
+          where: { accountId, userId },
           take: 100,
         }),
       );
@@ -262,7 +286,9 @@ describe('CashService', () => {
       accountRepo.findOne.mockResolvedValue(acc);
       accountRepo.remove = jest.fn().mockResolvedValue(acc);
 
-      await expect(service.deleteAccount(userId, accountId)).resolves.not.toThrow();
+      await expect(
+        service.deleteAccount(userId, accountId),
+      ).resolves.not.toThrow();
       expect(accountRepo.remove).toHaveBeenCalledWith(acc);
     });
 
@@ -271,7 +297,9 @@ describe('CashService', () => {
       acc.balance = 50;
       accountRepo.findOne.mockResolvedValue(acc);
 
-      await expect(service.deleteAccount(userId, accountId)).rejects.toThrow(BadRequestException);
+      await expect(service.deleteAccount(userId, accountId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

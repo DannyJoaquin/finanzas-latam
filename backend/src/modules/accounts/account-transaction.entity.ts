@@ -8,10 +8,10 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
-import { CashAccount } from './cash-account.entity';
+import { Account } from './account.entity';
 import { Expense } from '../expenses/expense.entity';
 
-export enum CashTxType {
+export enum AccountTxType {
   DEPOSIT = 'deposit',
   WITHDRAW = 'withdraw',
   SPEND = 'spend',
@@ -19,18 +19,18 @@ export enum CashTxType {
   SEND_TRANSFER = 'send_transfer',
 }
 
-@Index('idx_cash_tx_account_date', ['cashAccountId', 'date'])
-@Entity('cash_transactions')
-export class CashTransaction {
+@Index('idx_account_tx_account_date', ['accountId', 'date'])
+@Entity('account_transactions')
+export class AccountTransaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'cash_account_id' })
-  cashAccountId: string;
+  @Column({ name: 'account_id' })
+  accountId: string;
 
-  @ManyToOne(() => CashAccount, (ca) => ca.transactions)
-  @JoinColumn({ name: 'cash_account_id' })
-  cashAccount: CashAccount;
+  @ManyToOne(() => Account, (a) => a.transactions)
+  @JoinColumn({ name: 'account_id' })
+  account: Account;
 
   @Column({ name: 'user_id' })
   userId: string;
@@ -39,8 +39,8 @@ export class CashTransaction {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'enum', enum: CashTxType })
-  type: CashTxType;
+  @Column({ type: 'enum', enum: AccountTxType })
+  type: AccountTxType;
 
   @Column({ type: 'numeric', precision: 12, scale: 2 })
   amount: number;

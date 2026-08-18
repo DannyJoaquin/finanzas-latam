@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { SharedSettlement, SharedSettlementPaymentMethod } from './entities/shared-settlement.entity';
 import { CreateSettlementDto, UpdateSettlementDto } from './shared-groups.dto';
 import { SharedGroupsService } from './shared-groups.service';
-import { CashService } from '../cash/cash.service';
+import { AccountsService } from '../accounts/accounts.service';
 import { PushNotificationService } from '../../common/services/push-notification.service';
 import { User } from '../users/user.entity';
 import { formatMoney } from '../../common/utils/money-format.util';
@@ -17,7 +17,7 @@ export class SettlementsService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private groupsService: SharedGroupsService,
-    private cashService: CashService,
+    private cashService: AccountsService,
     private pushService: PushNotificationService,
   ) {}
 

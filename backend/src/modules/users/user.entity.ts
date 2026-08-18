@@ -13,7 +13,7 @@ import { Expense } from '../expenses/expense.entity';
 import { Category } from '../categories/category.entity';
 import { Budget } from '../budgets/budget.entity';
 import { Goal } from '../goals/goal.entity';
-import { CashAccount } from '../cash/cash-account.entity';
+import { Account } from '../accounts/account.entity';
 import { Insight } from '../insights/insight.entity';
 import { Rule } from '../rules/rule.entity';
 
@@ -137,8 +137,8 @@ export class User {
   @OneToMany(() => Goal, (g) => g.user)
   goals: Goal[];
 
-  @OneToMany(() => CashAccount, (ca) => ca.user)
-  cashAccounts: CashAccount[];
+  @OneToMany(() => Account, (a) => a.user)
+  cashAccounts: Account[];
 
   @OneToMany(() => Insight, (i) => i.user)
   insights: Insight[];

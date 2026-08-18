@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Category } from '../categories/category.entity';
-import { CashAccount } from '../cash/cash-account.entity';
+import { Account } from '../accounts/account.entity';
 import { CreditCard } from '../credit-cards/credit-card.entity';
 import { Expense } from '../expenses/expense.entity';
 import { ExpensesModule } from '../expenses/expenses.module';
@@ -12,7 +12,7 @@ import { RecurringExpensesJob } from '../../jobs/recurring-expenses.job';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RecurringExpense, Expense, Category, CashAccount, CreditCard]),
+    TypeOrmModule.forFeature([RecurringExpense, Expense, Category, Account, CreditCard]),
     ExpensesModule,
   ],
   controllers: [RecurringExpensesController],

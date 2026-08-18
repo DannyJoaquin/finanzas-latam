@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Category } from '../categories/category.entity';
-import { CashAccount } from '../cash/cash-account.entity';
+import { Account } from '../accounts/account.entity';
 import { CreditCard } from '../credit-cards/credit-card.entity';
 import { Expense, ExpenseSource, PaymentMethod } from '../expenses/expense.entity';
 import { ExpensesService } from '../expenses/expenses.service';
@@ -30,8 +30,8 @@ export class RecurringExpensesService {
     private expenseRepo: Repository<Expense>,
     @InjectRepository(Category)
     private categoryRepo: Repository<Category>,
-    @InjectRepository(CashAccount)
-    private cashAccountRepo: Repository<CashAccount>,
+    @InjectRepository(Account)
+    private cashAccountRepo: Repository<Account>,
     @InjectRepository(CreditCard)
     private creditCardRepo: Repository<CreditCard>,
     private expensesService: ExpensesService,

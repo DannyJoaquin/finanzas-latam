@@ -3,8 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ExpensesService } from './expenses.service';
 import { Expense } from './expense.entity';
-import { CashAccount } from '../cash/cash-account.entity';
-import { CashTransaction } from '../cash/cash-transaction.entity';
+import { Account } from '../accounts/account.entity';
+import { AccountTransaction } from '../accounts/account-transaction.entity';
 import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
 import { CategorizationLearningService } from '../categorization/categorization-learning.service';
 import { RulesEvaluatorService } from '../rules/rules-evaluator.service';
@@ -85,8 +85,8 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: getRepositoryToken(Expense), useFactory: mockExpenseRepo },
-        { provide: getRepositoryToken(CashAccount), useFactory: mockCashAccountRepo },
-        { provide: getRepositoryToken(CashTransaction), useFactory: mockCashTxRepo },
+        { provide: getRepositoryToken(Account), useFactory: mockCashAccountRepo },
+        { provide: getRepositoryToken(AccountTransaction), useFactory: mockCashTxRepo },
         { provide: ExpenseCategorizationService, useFactory: mockCategorizationService },
         { provide: CategorizationLearningService, useFactory: mockLearningService },
         { provide: RulesEvaluatorService, useFactory: mockRulesEvaluatorService },

@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
-import { CashAccount } from '../cash/cash-account.entity';
+import { Account } from '../accounts/account.entity';
 import { CreditCard } from '../credit-cards/credit-card.entity';
 import type { Expense, PaymentMethod } from '../expenses/expense.entity';
 
@@ -68,9 +68,9 @@ export class RecurringExpense {
   @Column({ name: 'cash_account_id', nullable: true })
   cashAccountId: string | null;
 
-  @ManyToOne(() => CashAccount, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'cash_account_id' })
-  cashAccount: CashAccount | null;
+  cashAccount: Account | null;
 
   @Column({ name: 'credit_card_id', nullable: true })
   creditCardId: string | null;

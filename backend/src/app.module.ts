@@ -20,7 +20,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { IncomesModule } from './modules/incomes/incomes.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
-import { CashModule } from './modules/cash/cash.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
 import { GoalsModule } from './modules/goals/goals.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { InsightsModule } from './modules/insights/insights.module';
@@ -138,7 +138,7 @@ import { UserNotificationPreferences } from './modules/users/user-notification-p
     IncomesModule,
     ExpensesModule,
     BudgetsModule,
-    CashModule,
+    AccountsModule,
     GoalsModule,
     AnalyticsModule,
     InsightsModule,

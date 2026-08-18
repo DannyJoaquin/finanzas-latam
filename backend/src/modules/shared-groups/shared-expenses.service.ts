@@ -7,7 +7,7 @@ import { SharedGroupSettings } from './entities/shared-group-settings.entity';
 import { SharedExpenseApproval, ApprovalStatus } from './entities/shared-expense-approval.entity';
 import { CreateSharedExpenseDto, UpdateSharedExpenseDto, UpdateGroupSettingsDto } from './shared-groups.dto';
 import { SharedGroupsService } from './shared-groups.service';
-import { CashService } from '../cash/cash.service';
+import { AccountsService } from '../accounts/accounts.service';
 import { PushNotificationService } from '../../common/services/push-notification.service';
 import { SharedGroupMember, SharedGroupMemberStatus } from './entities/shared-group-member.entity';
 import { SharedGroup } from './entities/shared-group.entity';
@@ -38,7 +38,7 @@ export class SharedExpensesService {
     @InjectRepository(Insight)
     private insightRepo: Repository<Insight>,
     private groupsService: SharedGroupsService,
-    private cashService: CashService,
+    private cashService: AccountsService,
     private pushService: PushNotificationService,
     private dataSource: DataSource,
   ) {}

@@ -4,8 +4,8 @@ import { Between, ILike, MoreThan, Repository } from 'typeorm';
 import { Expense, ExpenseSource, PaymentMethod } from './expense.entity';
 import { CreateExpenseDto, FilterExpensesDto, UpdateExpenseDto } from './dto/expense.dto';
 import { parsePagination, buildMeta } from '../../common/utils/pagination.util';
-import { CashAccount } from '../cash/cash-account.entity';
-import { CashTransaction, CashTxType } from '../cash/cash-transaction.entity';
+import { Account } from '../accounts/account.entity';
+import { AccountTransaction, AccountTxType } from '../accounts/account-transaction.entity';
 import { ExpenseCategorizationService } from '../categorization/expense-categorization.service';
 import { CategorizationLearningService } from '../categorization/categorization-learning.service';
 import { RulesEvaluatorService } from '../rules/rules-evaluator.service';
@@ -15,10 +15,10 @@ export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private expenseRepo: Repository<Expense>,
-    @InjectRepository(CashAccount)
-    private cashAccountRepo: Repository<CashAccount>,
-    @InjectRepository(CashTransaction)
-    private cashTxRepo: Repository<CashTransaction>,
+    @InjectRepository(Account)
+    private cashAccountRepo: Repository<Account>,
+    @InjectRepository(AccountTransaction)
+    private cashTxRepo: Repository<AccountTransaction>,
     private categorizationService: ExpenseCategorizationService,
     private learningService: CategorizationLearningService,
     private rulesEvaluatorService: RulesEvaluatorService,
@@ -159,9 +159,9 @@ export class ExpensesService {
           account.balance = Number(account.balance) - Number(saved.amount);
           await this.cashAccountRepo.save(account);
           const tx = this.cashTxRepo.create({
-            cashAccountId: account.id,
+            accountId: account.id,
             userId,
-            type: CashTxType.SPEND,
+            type: AccountTxType.SPEND,
             amount: saved.amount,
             description: saved.description || 'Gasto en efectivo',
             date: expenseDate,
@@ -219,7 +219,7 @@ export class ExpensesService {
         });
         if (tx) {
           const account = await this.cashAccountRepo.findOne({
-            where: { id: tx.cashAccountId, userId },
+            where: { id: tx.accountId, userId },
           });
           if (account) {
             account.balance = Number(account.balance) + Number(expense.amount);

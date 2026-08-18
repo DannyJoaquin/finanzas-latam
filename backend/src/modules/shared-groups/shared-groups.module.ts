@@ -14,7 +14,7 @@ import { BalancesService } from './balances.service';
 import { SettlementsService } from './settlements.service';
 import { SharedGroupsController } from './shared-groups.controller';
 import { SharedExpensesController } from './shared-expenses.controller';
-import { CashModule } from '../cash/cash.module';
+import { AccountsModule } from '../accounts/accounts.module';
 import { User } from '../users/user.entity';
 import { UserNotificationPreferences } from '../users/user-notification-preferences.entity';
 import { PushNotificationService } from '../../common/services/push-notification.service';
@@ -35,7 +35,7 @@ import { Insight } from '../insights/insight.entity';
       UserNotificationPreferences,
       Insight,
     ]),
-    CashModule,
+    AccountsModule,
   ],
   controllers: [SharedGroupsController, SharedExpensesController],
   providers: [
