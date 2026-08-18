@@ -19,6 +19,11 @@ export class CreateIncomeDto {
   @IsPositive()
   amount: number;
 
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
   @IsEnum(IncomeType)
   type: IncomeType;
 
@@ -50,6 +55,11 @@ export class UpdateIncomeDto {
   @IsNumber()
   @IsPositive()
   amount?: number;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
 
   @IsOptional()
   @IsEnum(IncomeType)

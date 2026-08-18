@@ -20,12 +20,14 @@ class IncomeModel {
     required this.type,
     required this.cycle,
     required this.isActive,
+    this.currency = 'HNL',
     this.nextExpectedAt,
   });
 
   final String id;
   final String sourceName;
   final double amount;
+  final String currency;
   final String type;
   final String cycle;
   final bool isActive;
@@ -37,6 +39,7 @@ class IncomeModel {
         // Backend may return numeric fields as strings (e.g. "5000.00")
         amount:
             double.parse((j['amount'] ?? j['estimatedAmount'] ?? 0).toString()),
+        currency: j['currency'] as String? ?? 'HNL',
         type: j['type'] as String? ?? 'salary',
         cycle: j['cycle'] as String? ?? 'monthly',
         isActive: j['isActive'] as bool? ?? true,
@@ -285,7 +288,8 @@ class IncomesScreen extends ConsumerWidget {
                                           CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          fmt.format(inc.amount),
+                                          currencyFmt(inc.currency)
+                                              .format(inc.amount),
                                           style: TextStyle(
                                             color: AppColors.income,
                                             fontWeight: FontWeight.w800,
@@ -449,6 +453,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _amountCtrl;
+  late String _currency;
   late String _type;
   late String _cycle;
   DateTime? _nextExpectedAt;
@@ -480,6 +485,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
     _nameCtrl = TextEditingController(text: e?.sourceName ?? '');
     _amountCtrl = TextEditingController(
         text: e != null ? formatMoneyInputValue(e.amount) : '');
+    _currency = e?.currency ?? ref.read(currencyProvider);
     _type = e?.type ?? 'salary';
     _cycle = e?.cycle ?? 'monthly';
     _nextExpectedAt =
@@ -503,6 +509,7 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
       final body = {
         'sourceName': _nameCtrl.text.trim(),
         'amount': parseMoneyInput(_amountCtrl.text),
+        'currency': _currency,
         'type': forceSimpleDefaults ? 'salary' : _type,
         'cycle': forceSimpleDefaults ? 'monthly' : _cycle,
         'nextExpectedAt': forceSimpleDefaults
@@ -556,22 +563,47 @@ class _IncomeSheetState extends ConsumerState<_IncomeSheet> {
                   (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [MoneyInputFormatter()],
-              decoration: InputDecoration(
-                labelText: 'Monto estimado',
-                prefixText: '${currencySymbol(ref.watch(currencyProvider))} ',
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Requerido';
-                final amount = parseMoneyInput(v);
-                if (amount == null) return 'Número inválido';
-                if (amount <= 0) return 'El monto debe ser mayor que cero';
-                return null;
-              },
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [MoneyInputFormatter()],
+                    decoration: InputDecoration(
+                      labelText: 'Monto estimado',
+                      prefixText: '${currencySymbol(_currency)} ',
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Requerido';
+                      final amount = parseMoneyInput(v);
+                      if (amount == null) return 'Número inválido';
+                      if (amount <= 0) return 'El monto debe ser mayor que cero';
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SegmentedButton<String>(
+                    segments: [
+                      const ButtonSegment(value: 'HNL', label: Text('L')),
+                      ButtonSegment(
+                          value: 'USD', label: Text(currencySymbol('USD'))),
+                    ],
+                    selected: {_currency},
+                    onSelectionChanged: (s) =>
+                        setState(() => _currency = s.first),
+                    style: SegmentedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (!isSimple) ...[
               const SizedBox(height: 16),
