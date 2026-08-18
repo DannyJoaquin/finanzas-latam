@@ -157,14 +157,23 @@ export class CreditCardsService {
     }
 
     const creditLimit = card.creditLimit ? Number(card.creditLimit) : null;
-    // Net unpaid HNL balance — used for utilization % (limit is in HNL)
+    const limitCurrency = card.limitCurrency ?? 'HNL';
+    // Utilization only sums the balance in the limit's own currency — there's
+    // no exchange rate in the system, so mixing HNL and USD spend against a
+    // single-currency limit would silently inflate the percentage.
     const unpaidOverdueHNL = closedCyclePaidAmount !== null
       ? Math.max(0, overdueBalanceHNL - closedCyclePaidAmount)
       : overdueBalanceHNL;
+    const unpaidOverdueUSD = closedCyclePaidAmount !== null
+      ? Math.max(0, overdueBalanceUSD - closedCyclePaidAmount)
+      : overdueBalanceUSD;
     const totalUsedHNL = currentSplit.hnl + unpaidOverdueHNL;
+    const totalUsedUSD = currentSplit.usd + unpaidOverdueUSD;
+    const totalUsedInLimitCurrency =
+      limitCurrency === 'USD' ? totalUsedUSD : totalUsedHNL;
     const utilizationPct =
       creditLimit && creditLimit > 0
-        ? Math.min(100, Math.round((totalUsedHNL / creditLimit) * 100))
+        ? Math.min(100, Math.round((totalUsedInLimitCurrency / creditLimit) * 100))
         : null;
 
     return {
