@@ -2038,7 +2038,6 @@ class _RecentExpenses extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (expenses.isEmpty) return const SizedBox.shrink();
-    final fmt = ref.watch(currencyFmtProvider);
     final theme = Theme.of(context);
 
     return Container(
@@ -2170,7 +2169,7 @@ class _RecentExpenses extends ConsumerWidget {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            '-${fmt.format(expense.amount)}',
+                            '-${currencyFmt(expense.currency).format(expense.amount)}',
                             textAlign: TextAlign.right,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: AppColors.expense,

@@ -107,6 +107,7 @@ class DashboardModel {
         id: m['id'] as String,
         description: m['description'] as String? ?? '',
         amount: double.parse((m['amount'] ?? 0).toString()),
+        currency: m['currency'] as String? ?? 'HNL',
         date: (m['date'] as String? ?? '').substring(0, 10.clamp(0, (m['date'] as String? ?? '').length)),
         categoryName: cat?['name'] as String? ?? '',
         categoryIcon: cat?['icon'] as String? ?? '💰',
@@ -156,11 +157,13 @@ class RecentExpense {
     required this.date,
     required this.categoryName,
     required this.categoryIcon,
+    this.currency = 'HNL',
     this.categoryIconIsEmoji = true,
   });
   final String id;
   final String description;
   final double amount;
+  final String currency;
   final String date;
   final String categoryName;
   final String categoryIcon;
@@ -170,6 +173,7 @@ class RecentExpense {
         id: j['id'] as String,
         description: j['description'] as String? ?? '',
         amount: double.parse((j['amount'] ?? 0).toString()),
+        currency: j['currency'] as String? ?? 'HNL',
         date: j['date'] as String,
         categoryName: j['categoryName'] as String? ?? '',
         categoryIcon: j['categoryIcon'] as String? ?? '💰',
