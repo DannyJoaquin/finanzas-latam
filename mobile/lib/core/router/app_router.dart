@@ -65,53 +65,10 @@ class AppRoutes {
   static String sharedGroupDetail(String id) => '/shared/$id';
   static String sharedAddExpense(String id) => '/shared/$id/add-expense';
 
-  // Order of the main bottom-nav/rail tabs, used to pick a slide direction
-  // when navigating between them (advanced mode superset; budgets is simply
-  // absent from the tab list in simple mode).
+  // Order of the main bottom-nav/rail tabs — mirrors the branch order in the
+  // StatefulShellRoute below. Budgets stays in the list even in simple mode
+  // (AppShell just hides that destination); its branch always exists.
   static const tabOrder = [home, expenses, incomes, budgets, goals, shared];
-
-  static int tabIndexOf(String location) {
-    if (location == shared || location.startsWith('$shared/')) {
-      return tabOrder.indexOf(shared);
-    }
-    for (var i = 0; i < tabOrder.length; i++) {
-      if (location.startsWith(tabOrder[i])) return i;
-    }
-    return -1;
-  }
-}
-
-// Tracks the previously active tab so route transitions can pick a slide
-// direction consistent with the tab's position in the bottom nav/rail,
-// instead of GoRouter's platform default (which always slides one way).
-int _lastTabIndex = 0;
-
-Page<void> _tabPage(GoRouterState state, Widget child) {
-  final newIndex = AppRoutes.tabIndexOf(state.uri.path);
-  final fromIndex = _lastTabIndex;
-  if (newIndex >= 0) _lastTabIndex = newIndex;
-
-  final goingForward = newIndex >= 0 && newIndex > fromIndex;
-  final beginOffset =
-      newIndex < 0 ? const Offset(0, 0.02) : Offset(goingForward ? 0.06 : -0.06, 0);
-
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: const Duration(milliseconds: 220),
-    reverseTransitionDuration: const Duration(milliseconds: 180),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: beginOffset, end: Offset.zero)
-              .animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
 }
 
 // A ChangeNotifier that GoRouter uses as refreshListenable.
@@ -196,89 +153,118 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.onboarding,
         builder: (c, s) => const OnboardingScreen(),
       ),
-      ShellRoute(
-        builder: (c, s, child) => AppShell(location: s.uri.path, child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.home,
-            pageBuilder: (c, s) => _tabPage(s, const HomeScreen()),
-          ),
-          GoRoute(
-            path: AppRoutes.expenses,
-            pageBuilder: (c, s) => _tabPage(s, const ExpensesListScreen()),
-            routes: [
-              GoRoute(
-                path: 'add',
-                builder: (c, s) => const AddExpenseScreen(),
-              ),
-              GoRoute(
-                path: 'recurring',
-                builder: (c, s) => const RecurringExpensesScreen(),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: AppRoutes.incomes,
-            pageBuilder: (c, s) => _tabPage(s, const IncomesScreen()),
-          ),
-          GoRoute(
-            path: AppRoutes.budgets,
-            pageBuilder: (c, s) => _tabPage(s, const BudgetsScreen()),
-          ),
-          GoRoute(
-            path: AppRoutes.goals,
-            pageBuilder: (c, s) => _tabPage(s, const GoalsScreen()),
-          ),
-          GoRoute(
+      StatefulShellRoute.indexedStack(
+        builder: (c, s, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.home,
+              builder: (c, s) => const HomeScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.expenses,
+              builder: (c, s) => const ExpensesListScreen(),
+              routes: [
+                GoRoute(
+                  path: 'add',
+                  builder: (c, s) => const AddExpenseScreen(),
+                ),
+                GoRoute(
+                  path: 'recurring',
+                  builder: (c, s) => const RecurringExpensesScreen(),
+                ),
+              ],
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.incomes,
+              builder: (c, s) => const IncomesScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.budgets,
+              builder: (c, s) => const BudgetsScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.goals,
+              builder: (c, s) => const GoalsScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: AppRoutes.shared,
+              builder: (c, s) => const SharedGroupsScreen(),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (c, s) => SharedGroupDetailScreen(
+                      groupId: s.pathParameters['id']!),
+                  routes: [
+                    GoRoute(
+                      path: 'add-expense',
+                      builder: (c, s) => AddSharedExpenseScreen(
+                          groupId: s.pathParameters['id']!),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ]),
+          // Non-tab destinations reachable from within the shell (settings,
+          // analytics, cash, credit cards, etc.) live in their own branch so
+          // they keep the bottom nav/rail chrome, without being one of the
+          // 6 primary tabs shown in it.
+          StatefulShellBranch(routes: [
+            GoRoute(
               path: AppRoutes.analytics,
-              builder: (c, s) => const AnalyticsScreen()),
-          GoRoute(
+              builder: (c, s) => const AnalyticsScreen(),
+            ),
+            GoRoute(
               path: AppRoutes.simulator,
-              builder: (c, s) => const SimulatorScreen()),
-          GoRoute(
-              path: AppRoutes.rules, builder: (c, s) => const RulesScreen()),
-          GoRoute(
+              builder: (c, s) => const SimulatorScreen(),
+            ),
+            GoRoute(
+              path: AppRoutes.rules,
+              builder: (c, s) => const RulesScreen(),
+            ),
+            GoRoute(
               path: AppRoutes.achievements,
-              builder: (c, s) => const AchievementsScreen()),
-          GoRoute(
-            path: AppRoutes.settings,
-            builder: (c, s) => const SettingsScreen(),
-            routes: [
-              GoRoute(
-                path: 'categories',
-                builder: (c, s) => const CategoriesManagementScreen(),
-              ),
-              GoRoute(
-                path: 'notifications',
-                builder: (c, s) => const NotificationSettingsScreen(),
-              ),
-            ],
-          ),
-          GoRoute(path: AppRoutes.cash, builder: (c, s) => const CashScreen()),
-          GoRoute(
+              builder: (c, s) => const AchievementsScreen(),
+            ),
+            GoRoute(
+              path: AppRoutes.settings,
+              builder: (c, s) => const SettingsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'categories',
+                  builder: (c, s) => const CategoriesManagementScreen(),
+                ),
+                GoRoute(
+                  path: 'notifications',
+                  builder: (c, s) => const NotificationSettingsScreen(),
+                ),
+              ],
+            ),
+            GoRoute(
+              path: AppRoutes.cash,
+              builder: (c, s) => const CashScreen(),
+            ),
+            GoRoute(
               path: AppRoutes.creditCards,
-              builder: (c, s) => const CreditCardsScreen()),
-          GoRoute(
+              builder: (c, s) => const CreditCardsScreen(),
+            ),
+            GoRoute(
               path: AppRoutes.loanCalculator,
-              builder: (c, s) => const LoanCalculatorScreen()),
-          GoRoute(
-            path: AppRoutes.shared,
-            pageBuilder: (c, s) => _tabPage(s, const SharedGroupsScreen()),
-            routes: [
-              GoRoute(
-                path: ':id',
-                builder: (c, s) =>
-                    SharedGroupDetailScreen(groupId: s.pathParameters['id']!),
-                routes: [
-                  GoRoute(
-                    path: 'add-expense',
-                    builder: (c, s) => AddSharedExpenseScreen(
-                        groupId: s.pathParameters['id']!),
-                  ),
-                ],
-              ),
-            ],
-          ),
+              builder: (c, s) => const LoanCalculatorScreen(),
+            ),
+          ]),
         ],
       ),
     ],

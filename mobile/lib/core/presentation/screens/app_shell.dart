@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../router/app_router.dart';
 import '../../../features/home/providers/dashboard_provider.dart';
 import '../../../features/expenses/providers/expenses_provider.dart';
 import '../../../features/budgets/presentation/screens/budgets_screen.dart';
@@ -11,10 +10,14 @@ import '../../../features/incomes/presentation/screens/incomes_screen.dart';
 import '../widgets/offline_banner.dart';
 import '../../providers/experience_provider.dart';
 
+/// Index, within [StatefulShellRoute]'s branches, of the 6 primary tabs. Must
+/// stay in sync with the branch order in app_router.dart — budgets is always
+/// branch 3, even in simple mode (AppShell only hides its nav destination).
+const _budgetsBranchIndex = 3;
+
 class AppShell extends ConsumerStatefulWidget {
-  const AppShell({super.key, required this.child, required this.location});
-  final Widget child;
-  final String location;
+  const AppShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -47,23 +50,11 @@ class _AppShellState extends ConsumerState<AppShell>
     }
   }
 
-  // Main tabs shown in the bottom nav — dynamic by experience mode
-  static const _tabsAdvanced = [
-    AppRoutes.home,
-    AppRoutes.expenses,
-    AppRoutes.incomes,
-    AppRoutes.budgets,
-    AppRoutes.goals,
-    AppRoutes.shared,
-  ];
-
-  static const _tabsSimple = [
-    AppRoutes.home,
-    AppRoutes.expenses,
-    AppRoutes.incomes,
-    AppRoutes.goals,
-    AppRoutes.shared,
-  ];
+  // Main tabs shown in the bottom nav — dynamic by experience mode. Values
+  // are branch indices into StatefulShellRoute (app_router.dart), NOT
+  // positions in this list — simple mode simply omits index 3 (budgets).
+  static const _branchIndicesAdvanced = [0, 1, 2, 3, 4, 5];
+  static const _branchIndicesSimple = [0, 1, 2, 4, 5];
 
   static const _labelsAdvanced = [
     'Inicio',
@@ -116,39 +107,59 @@ class _AppShellState extends ConsumerState<AppShell>
   @override
   Widget build(BuildContext context) {
     final isSimple = ref.watch(isSimpleModeProvider);
-    final tabs = isSimple ? _tabsSimple : _tabsAdvanced;
+    final branchIndices =
+        isSimple ? _branchIndicesSimple : _branchIndicesAdvanced;
     final labels = isSimple ? _labelsSimple : _labelsAdvanced;
     final icons = isSimple ? _iconsSimple : _iconsAdvanced;
     final activeIcons = isSimple ? _activeIconsSimple : _activeIconsAdvanced;
 
-    final location = widget.location;
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= 900;
     final isWideDesktop = width >= 1200;
 
-    // Guard: if the user is on /budgets but switches to simple mode, redirect home.
-    if (isSimple && location.startsWith(AppRoutes.budgets)) {
+    // Guard: if the user is on the budgets branch but switches to simple
+    // mode, redirect home (budgets has no nav destination in that mode).
+    if (isSimple && widget.navigationShell.currentIndex == _budgetsBranchIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go(AppRoutes.home);
+        if (mounted) widget.navigationShell.goBranch(0);
       });
     }
 
-    final currentIndex = _tabIndex(location, tabs);
+    // Non-tab destinations (settings, analytics, cash, etc.) live in the
+    // last branch and have no corresponding nav destination — none of the
+    // items below should show as "selected" while one of them is active.
+    final currentBranchIndex = widget.navigationShell.currentIndex;
+    final selectedNavIndex = branchIndices.indexOf(currentBranchIndex);
+
     final content = Column(
       children: [
         const OfflineBanner(),
-        Expanded(child: widget.child),
+        Expanded(
+          child: _AnimatedBranchSwitcher(
+            branchIndex: currentBranchIndex,
+            child: widget.navigationShell,
+          ),
+        ),
       ],
     );
+
+    void onDestinationSelected(int navIndex) {
+      final branchIndex = branchIndices[navIndex];
+      widget.navigationShell.goBranch(
+        branchIndex,
+        initialLocation: branchIndex == widget.navigationShell.currentIndex,
+      );
+    }
+
     final rail = NavigationRail(
       extended: isWideDesktop,
       labelType: isWideDesktop
           ? NavigationRailLabelType.none
           : NavigationRailLabelType.all,
-      selectedIndex: currentIndex,
-      onDestinationSelected: (i) => context.go(tabs[i]),
+      selectedIndex: selectedNavIndex < 0 ? 0 : selectedNavIndex,
+      onDestinationSelected: onDestinationSelected,
       destinations: List.generate(
-        tabs.length,
+        branchIndices.length,
         (i) => NavigationRailDestination(
           icon: Icon(icons[i]),
           selectedIcon: Icon(activeIcons[i]),
@@ -186,12 +197,12 @@ class _AppShellState extends ConsumerState<AppShell>
                   borderRadius: BorderRadius.circular(26),
                   child: NavigationBar(
                     height: 74,
-                    selectedIndex: currentIndex,
-                    onDestinationSelected: (i) => context.go(tabs[i]),
+                    selectedIndex: selectedNavIndex < 0 ? 0 : selectedNavIndex,
+                    onDestinationSelected: onDestinationSelected,
                     labelBehavior:
                         NavigationDestinationLabelBehavior.alwaysShow,
                     destinations: List.generate(
-                      tabs.length,
+                      branchIndices.length,
                       (i) => NavigationDestination(
                         icon: Icon(icons[i]),
                         selectedIcon: Icon(activeIcons[i]),
@@ -204,17 +215,81 @@ class _AppShellState extends ConsumerState<AppShell>
             ),
     );
   }
+}
 
-  int _tabIndex(String location, List<String> tabs) {
-    final sharedIndex = tabs.indexOf(AppRoutes.shared);
-    if (sharedIndex >= 0 &&
-        (location == AppRoutes.shared || location.startsWith('${AppRoutes.shared}/'))) {
-      return sharedIndex;
-    }
+/// Plays a short slide+fade whenever [branchIndex] changes, in the direction
+/// matching the branch's position in the bottom nav/rail (left when moving to
+/// an earlier tab, right when moving to a later one). Unlike wrapping
+/// [child] in an AnimatedSwitcher keyed by branchIndex, this never disposes
+/// [child] itself — [child] is the StatefulNavigationShell's IndexedStack,
+/// and destroying it would defeat the point of using indexedStack (each tab
+/// staying alive, keeping its provider state and avoiding a refetch/loading
+/// flash on every tab switch).
+class _AnimatedBranchSwitcher extends StatefulWidget {
+  const _AnimatedBranchSwitcher({
+    required this.branchIndex,
+    required this.child,
+  });
+  final int branchIndex;
+  final Widget child;
 
-    for (var i = 0; i < tabs.length; i++) {
-      if (location.startsWith(tabs[i])) return i;
+  @override
+  State<_AnimatedBranchSwitcher> createState() =>
+      _AnimatedBranchSwitcherState();
+}
+
+class _AnimatedBranchSwitcherState extends State<_AnimatedBranchSwitcher>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<Offset> _slide;
+  late Animation<double> _fade;
+  int _lastBranchIndex = 0;
+
+  static const _duration = Duration(milliseconds: 220);
+
+  @override
+  void initState() {
+    super.initState();
+    _lastBranchIndex = widget.branchIndex;
+    _controller = AnimationController(vsync: this, duration: _duration);
+    _slide = const AlwaysStoppedAnimation(Offset.zero);
+    _fade = const AlwaysStoppedAnimation(1);
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedBranchSwitcher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.branchIndex != _lastBranchIndex) {
+      final goingForward = widget.branchIndex > _lastBranchIndex;
+      _lastBranchIndex = widget.branchIndex;
+      final curved =
+          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+      _slide = Tween<Offset>(
+        begin: Offset(goingForward ? 0.06 : -0.06, 0),
+        end: Offset.zero,
+      ).animate(curved);
+      _fade = curved;
+      _controller
+        ..reset()
+        ..forward();
     }
-    return 0;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) => FadeTransition(
+        opacity: _fade,
+        child: SlideTransition(position: _slide, child: child),
+      ),
+    );
   }
 }
