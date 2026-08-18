@@ -69,6 +69,7 @@ class ExpenseModel {
     required this.categoryName,
     required this.categoryIcon,
     required this.paymentMethod,
+    this.creditCardId,
     this.isRecurring = false,
     this.source = 'manual',
     this.recurringExpenseId,
@@ -86,6 +87,7 @@ class ExpenseModel {
   final String categoryName;
   final String categoryIcon;
   final String paymentMethod;
+  final String? creditCardId;
   final bool isRecurring;
   final String source;
   final String? recurringExpenseId;
@@ -105,6 +107,7 @@ class ExpenseModel {
       categoryName: cat?['name'] as String? ?? '',
       categoryIcon: cat?['icon'] as String? ?? '💰',
       paymentMethod: j['paymentMethod'] as String? ?? 'cash',
+      creditCardId: j['creditCardId'] as String?,
       isRecurring: j['isRecurring'] as bool? ??
           j['source'] == 'auto' || j['recurringExpenseId'] != null,
       source: j['source'] as String? ?? 'manual',

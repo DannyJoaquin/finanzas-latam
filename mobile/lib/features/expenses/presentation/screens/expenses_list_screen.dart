@@ -13,6 +13,7 @@ import '../../../../core/constants/currency_format.dart';
 import '../../../../core/providers/experience_provider.dart';
 import '../../../../features/auth/providers/auth_provider.dart';
 import '../../../../core/formatters/money_input_formatter.dart';
+import '../../../../features/credit_cards/providers/credit_cards_provider.dart';
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -1083,6 +1084,7 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
       TextEditingController(text: widget.expense.description);
   late String? _selectedCategoryId = widget.expense.categoryId;
   late String _paymentMethod = widget.expense.paymentMethod;
+  late String? _selectedCreditCardId = widget.expense.creditCardId;
   late DateTime _date = DateTime.parse(widget.expense.date);
 
   bool _saving = false;
@@ -1129,6 +1131,8 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
         if (desc.isNotEmpty) 'description': desc,
         'categoryId': _selectedCategoryId,
         'paymentMethod': _paymentMethod,
+        'creditCardId':
+            _paymentMethod == 'card_credit' ? _selectedCreditCardId : null,
         'date': DateFormat('yyyy-MM-dd').format(_date),
       });
       widget.onSaved();
@@ -1292,8 +1296,56 @@ class _EditExpenseSheetState extends ConsumerState<_EditExpenseSheet> {
                     .toList(),
                 onChanged: busy
                     ? null
-                    : (v) => setState(() => _paymentMethod = v ?? 'cash'),
+                    : (v) => setState(() {
+                          _paymentMethod = v ?? 'cash';
+                          _selectedCreditCardId = null;
+                        }),
               ),
+              if (_paymentMethod == 'card_credit') ...[
+                const SizedBox(height: 16),
+                ref.watch(creditCardsProvider).when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (cards) {
+                        final validId =
+                            cards.any((c) => c.id == _selectedCreditCardId)
+                                ? _selectedCreditCardId
+                                : null;
+                        return cards.isEmpty
+                            ? Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF9800).withAlpha(20),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFFFF9800)
+                                          .withAlpha(80)),
+                                ),
+                                child: const Text(
+                                  'No tienes tarjetas registradas. Agrégalas en la sección de Tarjetas.',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              )
+                            : DropdownButtonFormField<String>(
+                                initialValue: validId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Tarjeta de crédito',
+                                  prefixIcon: Icon(Icons.credit_card_outlined),
+                                ),
+                                items: cards
+                                    .map((c) => DropdownMenuItem(
+                                          value: c.id,
+                                          child: Text(c.name),
+                                        ))
+                                    .toList(),
+                                onChanged: busy
+                                    ? null
+                                    : (v) =>
+                                        setState(() => _selectedCreditCardId = v),
+                              );
+                      },
+                    ),
+              ],
               const SizedBox(height: 16),
               ListTile(
                 contentPadding: EdgeInsets.zero,
