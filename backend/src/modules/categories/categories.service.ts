@@ -39,6 +39,22 @@ export class CategoriesService {
     if (category.isSystem) throw new BadRequestException('Cannot modify system categories');
     if (category.userId !== userId) throw new NotFoundException('Category not found');
 
+    if (dto.parentId !== undefined && dto.parentId !== category.parentId) {
+      if (dto.parentId === id) {
+        throw new BadRequestException('A category cannot be its own parent');
+      }
+      if (dto.parentId !== null) {
+        const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+        if (!parent) throw new BadRequestException('Parent category not found');
+        if (parent.type !== category.type) {
+          throw new BadRequestException('Parent category must be of the same type');
+        }
+        if (parent.parentId === id) {
+          throw new BadRequestException('Cannot assign a child category as the parent');
+        }
+      }
+    }
+
     Object.assign(category, dto);
     return this.categoryRepo.save(category);
   }

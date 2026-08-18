@@ -13,6 +13,7 @@ class SettingsCategoryItem {
     required this.icon,
     required this.color,
     required this.isSystem,
+    this.parentId,
     this.parentName,
   });
 
@@ -22,10 +23,11 @@ class SettingsCategoryItem {
   final String icon;
   final String color;
   final bool isSystem;
+  final String? parentId;
   final String? parentName;
 
   factory SettingsCategoryItem.fromJson(Map<String, dynamic> j,
-      {String? parentName}) {
+      {String? parentId, String? parentName}) {
     return SettingsCategoryItem(
       id: j['id'] as String,
       name: j['name'] as String? ?? '',
@@ -33,6 +35,7 @@ class SettingsCategoryItem {
       icon: j['icon'] as String? ?? 'category',
       color: j['color'] as String? ?? '#9E9E9E',
       isSystem: j['isSystem'] as bool? ?? false,
+      parentId: parentId,
       parentName: parentName,
     );
   }
@@ -53,6 +56,7 @@ final settingsCategoriesProvider =
   final result = <SettingsCategoryItem>[];
   for (final item in raw) {
     final parent = item as Map<String, dynamic>;
+    final parentId = parent['id'] as String?;
     final parentName = parent['name'] as String?;
     final children = parent['children'] as List<dynamic>? ?? [];
 
@@ -65,6 +69,7 @@ final settingsCategoriesProvider =
       result.add(
         SettingsCategoryItem.fromJson(
           child as Map<String, dynamic>,
+          parentId: parentId,
           parentName: parentName,
         ),
       );
@@ -77,6 +82,37 @@ final settingsCategoriesProvider =
   });
 
   return result;
+});
+
+class ParentCategoryOption {
+  const ParentCategoryOption({
+    required this.id,
+    required this.name,
+    required this.type,
+  });
+  final String id;
+  final String name;
+  final String type;
+}
+
+/// Top-level categories eligible as a "parent" — used only by the picker in
+/// the create/edit sheet, kept separate from [settingsCategoriesProvider] so
+/// the flattened management list (which intentionally omits parents that
+/// have children) is unaffected.
+final parentCategoryOptionsProvider =
+    FutureProvider.autoDispose<List<ParentCategoryOption>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final resp = await dio.get(ApiConstants.categories);
+  final raw = resp.data as List<dynamic>? ?? [];
+
+  return raw
+      .map((e) => e as Map<String, dynamic>)
+      .map((j) => ParentCategoryOption(
+            id: j['id'] as String,
+            name: j['name'] as String? ?? '',
+            type: j['type'] as String? ?? 'expense',
+          ))
+      .toList();
 });
 
 class CategoriesManagementScreen extends ConsumerStatefulWidget {
@@ -302,6 +338,7 @@ class _UpsertCategorySheetState extends ConsumerState<_UpsertCategorySheet> {
   late final TextEditingController _iconCtrl;
   late final TextEditingController _colorCtrl;
   late String _type;
+  late String? _selectedParentId;
   bool _saving = false;
 
   static const _iconOptions = [
@@ -413,6 +450,7 @@ class _UpsertCategorySheetState extends ConsumerState<_UpsertCategorySheet> {
       text:
           widget.current?.color ?? (_type == 'expense' ? '#E57373' : '#66BB6A'),
     );
+    _selectedParentId = widget.current?.parentId;
   }
 
   @override
@@ -438,6 +476,7 @@ class _UpsertCategorySheetState extends ConsumerState<_UpsertCategorySheet> {
         _colorCtrl.text = _defaultColor(value);
       }
       _type = value;
+      _selectedParentId = null;
     });
   }
 
@@ -451,6 +490,7 @@ class _UpsertCategorySheetState extends ConsumerState<_UpsertCategorySheet> {
         'name': _nameCtrl.text.trim(),
         'icon': _iconCtrl.text.trim(),
         'color': _colorCtrl.text.trim(),
+        'parentId': _selectedParentId,
       };
 
       if (widget.current == null) {
@@ -617,6 +657,42 @@ class _UpsertCategorySheetState extends ConsumerState<_UpsertCategorySheet> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 12),
+                ref.watch(parentCategoryOptionsProvider).when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (options) {
+                        final choices = options
+                            .where((o) =>
+                                o.type == _type && o.id != widget.current?.id)
+                            .toList();
+                        final validParentId =
+                            choices.any((o) => o.id == _selectedParentId)
+                                ? _selectedParentId
+                                : null;
+                        return DropdownButtonFormField<String?>(
+                          initialValue: validParentId,
+                          decoration: const InputDecoration(
+                            labelText: 'Categoría padre (opcional)',
+                            prefixIcon: Icon(Icons.account_tree_outlined),
+                          ),
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Sin categoría padre'),
+                            ),
+                            ...choices.map((o) => DropdownMenuItem<String?>(
+                                  value: o.id,
+                                  child: Text(o.name,
+                                      overflow: TextOverflow.ellipsis),
+                                )),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _selectedParentId = v),
+                        );
+                      },
+                    ),
                 const SizedBox(height: 24),
                 const _CategorySectionHeading(
                   icon: Icons.auto_awesome_outlined,
