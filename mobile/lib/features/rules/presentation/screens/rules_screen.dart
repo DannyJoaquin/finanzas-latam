@@ -67,6 +67,13 @@ const _triggerLabels = {
   'periodic': 'Periódico',
 };
 
+// Only 'expense_added' actually evaluates rules today — the backend has no
+// evaluator wired up for the others (see RulesEvaluatorService). The create
+// form only offers this one so users don't build rules that silently never
+// fire; existing rules with another trigger still show their real label
+// via _triggerLabels above.
+const _supportedTrigger = 'expense_added';
+
 const _actionLabels = {
   'notify': 'Notificar',
   'tag': 'Etiquetar',
@@ -345,11 +352,12 @@ class _CreateRuleSheet extends ConsumerStatefulWidget {
 class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
   final _nameCtrl = TextEditingController();
   final _actionValueCtrl = TextEditingController();
-  String _trigger = 'expense_added';
+  final _trigger = _supportedTrigger;
   String _action = 'notify';
   String _condField = 'amount';
   String _condOp = 'gt';
   final _condValueCtrl = TextEditingController(text: '0');
+  String? _condCategoryId;
   bool _saving = false;
 
   @override
@@ -381,6 +389,20 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
       );
       return;
     }
+    if (_condField == 'category' && _condCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una categoría para la condición')),
+      );
+      return;
+    }
+
+    final condition = _condField == 'category'
+        ? {'field': 'categoryId', 'op': 'eq', 'value': _condCategoryId}
+        : {
+            'field': _condField,
+            'op': _condOp,
+            'value': double.tryParse(_condValueCtrl.text) ?? 0,
+          };
 
     setState(() => _saving = true);
     try {
@@ -388,13 +410,7 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
       await dio.post(ApiConstants.rules, data: {
         'name': name,
         'triggerType': _trigger,
-        'conditions': [
-          {
-            'field': _condField,
-            'op': _condOp,
-            'value': double.tryParse(_condValueCtrl.text) ?? 0,
-          }
-        ],
+        'conditions': [condition],
         'actions': [
           {
             'type': _action,
@@ -445,77 +461,100 @@ class _CreateRuleSheetState extends ConsumerState<_CreateRuleSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Trigger
-          DropdownButtonFormField<String>(
-            initialValue: _trigger,
+          // Trigger — only expense_added currently evaluates rules, so it's
+          // shown as a fixed label rather than a choice that could silently
+          // never fire.
+          InputDecorator(
             decoration: const InputDecoration(
               labelText: 'Disparador',
               border: OutlineInputBorder(),
             ),
-            items: _triggerLabels.entries
-                .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                .toList(),
-            onChanged: (v) => setState(() => _trigger = v!),
+            child: Text(_triggerLabels[_trigger] ?? _trigger),
           ),
           const SizedBox(height: 16),
 
           // Condition
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final fieldDropdown = DropdownButtonFormField<String>(
-                initialValue: _condField,
-                decoration: const InputDecoration(
-                  labelText: 'Campo',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'amount', child: Text('Monto')),
-                  DropdownMenuItem(value: 'category', child: Text('Categoría')),
-                ],
-                onChanged: (v) => setState(() => _condField = v!),
-              );
-              final operatorDropdown = DropdownButtonFormField<String>(
-                initialValue: _condOp,
-                decoration: const InputDecoration(
-                  labelText: 'Operador',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'gt', child: Text('Mayor que')),
-                  DropdownMenuItem(value: 'lt', child: Text('Menor que')),
-                  DropdownMenuItem(value: 'eq', child: Text('Igual a')),
-                ],
-                onChanged: (v) => setState(() => _condOp = v!),
-              );
-
-              if (constraints.maxWidth < 420) {
-                return Column(
-                  children: [
-                    fieldDropdown,
-                    const SizedBox(height: 12),
-                    operatorDropdown,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: fieldDropdown),
-                  const SizedBox(width: 8),
-                  Expanded(child: operatorDropdown),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _condValueCtrl,
-            keyboardType: TextInputType.number,
+          DropdownButtonFormField<String>(
+            initialValue: _condField,
             decoration: const InputDecoration(
-              labelText: 'Valor de condición',
+              labelText: 'Campo',
               border: OutlineInputBorder(),
             ),
+            items: const [
+              DropdownMenuItem(value: 'amount', child: Text('Monto')),
+              DropdownMenuItem(value: 'category', child: Text('Categoría')),
+            ],
+            onChanged: (v) => setState(() => _condField = v!),
           ),
+          const SizedBox(height: 10),
+          if (_condField == 'category')
+            categoriesAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text(
+                'No se pudieron cargar las categorías: $e',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              data: (categories) => DropdownButtonFormField<String>(
+                initialValue: categories.any((c) => c.id == _condCategoryId)
+                    ? _condCategoryId
+                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Es la categoría',
+                  border: OutlineInputBorder(),
+                ),
+                items: categories
+                    .map((category) => DropdownMenuItem(
+                          value: category.id,
+                          child: Text(category.name),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _condCategoryId = v),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final operatorDropdown = DropdownButtonFormField<String>(
+                  initialValue: _condOp,
+                  decoration: const InputDecoration(
+                    labelText: 'Operador',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'gt', child: Text('Mayor que')),
+                    DropdownMenuItem(value: 'lt', child: Text('Menor que')),
+                    DropdownMenuItem(value: 'eq', child: Text('Igual a')),
+                  ],
+                  onChanged: (v) => setState(() => _condOp = v!),
+                );
+                final valueField = TextField(
+                  controller: _condValueCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Valor de condición',
+                    border: OutlineInputBorder(),
+                  ),
+                );
+
+                if (constraints.maxWidth < 420) {
+                  return Column(
+                    children: [
+                      operatorDropdown,
+                      const SizedBox(height: 12),
+                      valueField,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: operatorDropdown),
+                    const SizedBox(width: 8),
+                    Expanded(child: valueField),
+                  ],
+                );
+              },
+            ),
           const SizedBox(height: 16),
 
           // Action

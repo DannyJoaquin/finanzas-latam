@@ -123,6 +123,9 @@ export class RulesEvaluatorService {
       'paymentMethod': expense.paymentMethod,
       'description': expense.description,
       'categoryId': expense.categoryId,
+      // 'category' is an alias for rules created by the mobile app's
+      // condition picker, which labels this field "Categoría".
+      'category': expense.categoryId,
     };
     return map[field] ?? null;
   }
