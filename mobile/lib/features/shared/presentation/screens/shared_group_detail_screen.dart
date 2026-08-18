@@ -92,41 +92,70 @@ class _SharedGroupDetailScreenState
               if (val == 'export_pdf') await _exportPdf(context);
               if (val == 'import') _showImportDialog(context);
               if (val == 'settings') _showSettingsDialog(context);
+              if (val == 'leave') await _handleLeaveGroup(context);
+              if (val == 'delete_group') await _handleDeleteGroup(context);
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'export_csv',
-                child: ListTile(
-                  leading: Icon(Icons.table_chart_outlined),
-                  title: Text('Exportar CSV'),
-                  contentPadding: EdgeInsets.zero,
+            itemBuilder: (_) {
+              final isOwner = groupAsync.valueOrNull?.ownerId == currentUserId;
+              return [
+                const PopupMenuItem(
+                  value: 'export_csv',
+                  child: ListTile(
+                    leading: Icon(Icons.table_chart_outlined),
+                    title: Text('Exportar CSV'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'export_pdf',
-                child: ListTile(
-                  leading: Icon(Icons.picture_as_pdf_outlined),
-                  title: Text('Exportar PDF'),
-                  contentPadding: EdgeInsets.zero,
+                const PopupMenuItem(
+                  value: 'export_pdf',
+                  child: ListTile(
+                    leading: Icon(Icons.picture_as_pdf_outlined),
+                    title: Text('Exportar PDF'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'import',
-                child: ListTile(
-                  leading: Icon(Icons.upload_file_outlined),
-                  title: Text('Importar CSV'),
-                  contentPadding: EdgeInsets.zero,
+                const PopupMenuItem(
+                  value: 'import',
+                  child: ListTile(
+                    leading: Icon(Icons.upload_file_outlined),
+                    title: Text('Importar CSV'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'settings',
-                child: ListTile(
-                  leading: Icon(Icons.settings_outlined),
-                  title: Text('Configuración'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+                if (isOwner)
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: ListTile(
+                      leading: Icon(Icons.settings_outlined),
+                      title: Text('Configuración'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                const PopupMenuDivider(),
+                if (isOwner)
+                  const PopupMenuItem(
+                    value: 'delete_group',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_forever_outlined,
+                          color: Colors.red),
+                      title: Text('Eliminar grupo',
+                          style: TextStyle(color: Colors.red)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  )
+                else
+                  const PopupMenuItem(
+                    value: 'leave',
+                    child: ListTile(
+                      leading:
+                          Icon(Icons.logout_outlined, color: Colors.red),
+                      title: Text('Salir del grupo',
+                          style: TextStyle(color: Colors.red)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+              ];
+            },
           ),
         ],
         bottom: TabBar(
@@ -413,6 +442,84 @@ class _SharedGroupDetailScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Error al generar PDF: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleLeaveGroup(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Salir del grupo'),
+        content: const Text(
+            '¿Salir de este grupo? Dejarás de ver sus gastos y balances.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref
+          .read(sharedGroupsRepositoryProvider)
+          .leaveGroup(widget.groupId);
+      ref.invalidate(sharedGroupsProvider);
+      ref.invalidate(sharedWidgetSummaryProvider);
+      if (context.mounted) context.pop();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al salir: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDeleteGroup(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar grupo'),
+        content: const Text(
+            '¿Eliminar este grupo para todos los miembros? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref
+          .read(sharedGroupsRepositoryProvider)
+          .deleteGroup(widget.groupId);
+      ref.invalidate(sharedGroupsProvider);
+      ref.invalidate(sharedWidgetSummaryProvider);
+      if (context.mounted) context.pop();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error al eliminar: $e'),
               backgroundColor: Colors.red),
         );
       }
