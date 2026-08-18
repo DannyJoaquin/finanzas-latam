@@ -55,7 +55,7 @@ export class Account {
   @Column({ name: 'sort_order', type: 'smallint', default: 0 })
   sortOrder: number;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   institution: string | null;
 
   // Whether this account's balance can be spent from (drives expense/income
